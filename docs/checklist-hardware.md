@@ -20,6 +20,22 @@ Legenda: ✅ passou · ⚠️ passou com ressalva · ⏳ ainda não testado
 | `stopPolling` | Polling ativo | Alternar o switch de polling | `status` para de chegar | Telemetria congela e a tela avisa "Polling parado" | 2026-09-30 | ✅ |
 | `queryDeviceInfo` | Conectado | Automático ao conectar | Evento `deviceInfo` | `DEVICE_INFO` recebido (resposta à consulta `01 61 00 00 00 00 00 00 00 06`) | 2026-09-30 | ✅ |
 | `stop` | Conectado | Botão STOP | `run = STOP` enviado na hora | Sem erro; tela mostrou "STOP enviado". Estado seguiu `stop` (a máquina já estava parada) | 2026-09-30 | ✅ |
+| `getDeviceParams` | SDK inicializado | Aba Parâmetros, "Ler valores salvos" | Valores guardados no app | `5 / 120 / 5 / 100 / 150 / 25 / 2 / 50 / 10 / 10 / 10`, iguais aos do painel original (confirmado pelo usuário). É o cache do SDK, não uma leitura do controlador | 2026-09-30 | ✅ |
+| `sendDeviceParams` | Conectado | Alterar a força mínima e "Enviar ao controlador" (com confirmação) | `paramsAck` com os mesmos valores | Enviou 15 e depois restaurou 5; nos dois casos o controlador confirmou sem divergência. Resposta em 92 ms | 2026-09-30 | ✅ |
+| `paramsAck` (evento) | Após o envio | — | `DeviceParams` devolvido pelo controlador | Chegou e a tela mostrou a confirmação; `RX SEND_PARAMS` no log | 2026-09-30 | ✅ |
+
+## Protocolo observado: envio de parâmetros (`SEND_PARAMS`)
+Bytes lidos do `logcat` (`SerialPortSender` e `SerialPortManager`) com a força mínima em 5. Observado, não confirmado pelo fabricante.
+
+| Sentido | Bytes |
+| --- | --- |
+| Envio (`参数下发指令`) | `01 65 05 78 05 64 FF 96 19 02 32 0A 0A 0A 00 00 00 00 00 00 00 00 00 B3` |
+| Resposta (`SEND_PARAMS`) | `01 65 05 78 05 64 00 96 19 02 32 0A 0A 0A 00 00 00 00 00 00 00 00 00 25` |
+
+Mapeamento inferido (valores do painel original): `01 65` cabeçalho e comando; depois `minForce` (05), `maxForce` (78 = 120), `inactiveForce` (05), `maxLength` (64 = 100), 2 bytes de `ratedSpeed` (`96` = 150 no byte baixo), `ropeGuideDiameter` (19 = 25), `orginMinDistance` (02), `orginMaxDistance` (32 = 50), `velocityRange`, `torqueVariationCycle` e `torqueCoefficient` (0A = 10 cada), 9 bytes zerados e 1 byte final de verificação.
+
+- **Byte alto de `ratedSpeed`:** o SDK envia `FF` e o controlador devolve `00`, então o valor guardado é 150. É compatível com extensão de sinal de um byte (150 como `byte` vira -106 = `FF96`). **Hipótese não confirmada:** para velocidades nominais acima de 127 o SDK pode estar montando o byte alto errado; vale perguntar ao fabricante junto com a especificação do protocolo (pergunta 5).
+- **Byte de verificação:** não é soma simples; não foi decifrado e não é necessário (o SDK monta o comando).
 
 ## Taxa de polling x resposta do controlador
 Medido pelo log TX/RX do app em duas sessões (build debug, 2026-09-30). "Resposta" = respostas `CONTROL` divididas pelos comandos `CONTROL` enviados. A segunda sessão foi feita **com o cabo da máquina em movimento**, em `STOP`.
@@ -51,4 +67,4 @@ Força real 0 · velocidade 0,0 cm/s · curso 1 cm · temperatura 27,0 °C · re
 Ainda não se sabe se `velocidade` e `repetições` passam a variar em `RUNNING` (Fase 4).
 
 ## Pendências da Fase 2 para fechar o checklist
-- Testar `connect` manual e a reconexão com a máquina reiniciada (opcional, não bloqueia a Fase 3).
+- Testar `connect` manual e a reconexão com a máquina reiniciada (opcional).

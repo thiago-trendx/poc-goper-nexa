@@ -102,9 +102,22 @@ class MachineRepository {
 
   // ---- Parâmetros ----
 
-  Future<DeviceParams> getDeviceParams() => _gateway.getDeviceParams();
-  Future<void> sendDeviceParams(DeviceParams params) => _gateway.sendDeviceParams(params);
-  Future<ControlSnapshot> getControlParams() => _gateway.getControlParams();
+  /// Parâmetros guardados no `DeviceManager` (cache local; o controlador não tem comando de leitura).
+  /// Inicializa o SDK antes, porque o `DeviceManager` precisa do `init` para ler o cache.
+  Future<DeviceParams> getDeviceParams() async {
+    await _ensureInitialized();
+    return _gateway.getDeviceParams();
+  }
+
+  /// Só por ação explícita do usuário: nada envia parâmetros ao conectar.
+  Future<void> sendDeviceParams(DeviceParams params) async {
+    await _ensureInitialized();
+    await _gateway.sendDeviceParams(params);
+  }
+  Future<ControlSnapshot> getControlParams() async {
+    await _ensureInitialized();
+    return _gateway.getControlParams();
+  }
 
   // ---- Controle ----
 

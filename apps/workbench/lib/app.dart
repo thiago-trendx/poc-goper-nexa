@@ -11,6 +11,7 @@ import 'features/control/control_bloc.dart';
 import 'features/control/control_page.dart';
 import 'features/device_params/device_params_bloc.dart';
 import 'features/device_params/device_params_page.dart';
+import 'features/device_params/profile_store.dart';
 import 'features/firmware/firmware_bloc.dart';
 import 'features/firmware/firmware_page.dart';
 import 'features/lift_motor/lift_motor_bloc.dart';
@@ -25,14 +26,17 @@ import 'shared/widgets/emergency_stop_button.dart';
 
 /// Raiz do app: repositório, Blocs e navegação.
 class WorkbenchApp extends StatelessWidget {
-  const WorkbenchApp({
+  WorkbenchApp({
     super.key,
     required this.gateway,
     this.limits = const SafetyLimits(),
     this.forceDebounce = const Duration(milliseconds: 150),
     this.logExporter = const FileLogExporter(),
     this.simulated = false,
-  });
+    ProfileStore? profileStore,
+  }) : profileStore = profileStore ?? _defaultProfileStore;
+
+  static final ProfileStore _defaultProfileStore = FileProfileStore();
 
   final MachineGateway gateway;
   final SafetyLimits limits;
@@ -43,12 +47,16 @@ class WorkbenchApp extends StatelessWidget {
   /// ninguém confundir os valores simulados com os da máquina.
   final bool simulated;
 
+  /// Onde os perfis de `DeviceParams` são salvos (JSON, um arquivo por perfil).
+  final ProfileStore profileStore;
+
   @override
   Widget build(BuildContext context) {
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider<SafetyLimits>.value(value: limits),
         RepositoryProvider<LogExporter>.value(value: logExporter),
+        RepositoryProvider<ProfileStore>.value(value: profileStore),
         RepositoryProvider<MachineRepository>(
           create: (_) => MachineRepository(gateway),
           dispose: (repository) => unawaited(repository.dispose()),
@@ -63,8 +71,10 @@ class WorkbenchApp extends StatelessWidget {
           ),
           BlocProvider(
             lazy: false,
-            create: (context) =>
-                DeviceParamsBloc(context.read<MachineRepository>())..add(const DeviceParamsLoaded()),
+            create: (context) => DeviceParamsBloc(
+              context.read<MachineRepository>(),
+              profiles: context.read<ProfileStore>(),
+            )..add(const DeviceParamsLoaded()),
           ),
           BlocProvider(
             lazy: false,

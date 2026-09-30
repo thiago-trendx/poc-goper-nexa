@@ -3,11 +3,14 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poc_goper_nexa/app.dart';
+import 'package:poc_goper_nexa/features/device_params/profile_store.dart';
 import 'package:poc_goper_nexa/features/log/log_exporter.dart';
+import 'package:sdk850_bridge/testing.dart';
 import 'package:poc_goper_nexa/shared/safety/safety_limits.dart';
 import 'package:poc_goper_nexa/shared/widgets/emergency_stop_button.dart';
 import 'package:sdk850_bridge/sdk850_bridge.dart';
 
+import 'helpers/memory_profile_store.dart';
 import 'helpers/spy_gateway.dart';
 
 class _FakeExporter implements LogExporter {
@@ -28,6 +31,7 @@ Future<void> pumpApp(
   SafetyLimits limits = const SafetyLimits(),
   LogExporter? logExporter,
   bool simulated = false,
+  MemoryProfileStore? profileStore,
 }) async {
   tester.view.physicalSize = const Size(1920, 1080);
   tester.view.devicePixelRatio = 1.0;
@@ -38,6 +42,7 @@ Future<void> pumpApp(
     forceDebounce: const Duration(milliseconds: 10),
     logExporter: logExporter ?? _FakeExporter(),
     simulated: simulated,
+    profileStore: profileStore ?? MemoryProfileStore(),
   ));
   await tester.pump();
 }
@@ -239,6 +244,168 @@ void main() {
     });
   });
 
+  group('parâmetros: origem dos valores, divergência e perfis', () {
+    Future<void> send(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('params_send')));
+      await tester.pump(const Duration(milliseconds: 100));
+      await confirmDialog(tester, confirm: true);
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+
+    String fieldText(WidgetTester tester, String key) =>
+        tester.widget<TextField>(find.byKey(Key(key))).controller!.text;
+
+    testWidgets('deixa claro que os valores não são uma leitura do controlador', (tester) async {
+      await pumpApp(tester, SpyGateway());
+      await goTo(tester, AppDestination.deviceParams);
+
+      expect(find.byKey(const Key('params_origin_note')), findsOneWidget);
+      expect(find.textContaining('não uma leitura do controlador'), findsOneWidget);
+      expect(find.text('Ler valores salvos'), findsOneWidget);
+      expect(find.text('Ler da máquina'), findsNothing);
+      await disposeApp(tester);
+    });
+
+    testWidgets('conectar e ligar o polling nunca envia parâmetros', (tester) async {
+      final gateway = SpyGateway();
+      await pumpApp(tester, gateway);
+
+      await connect(tester);
+      await tester.pump(const Duration(seconds: 2));
+
+      expect(gateway.sentParams, isEmpty);
+      await disposeApp(tester);
+    });
+
+    testWidgets('o envio só acontece depois da confirmação', (tester) async {
+      final gateway = SpyGateway();
+      await pumpApp(tester, gateway);
+      await connect(tester);
+      await goTo(tester, AppDestination.deviceParams);
+      await tester.enterText(find.byKey(const Key('param_minForce')), '10');
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('params_send')));
+      await tester.pump(const Duration(milliseconds: 100));
+      await confirmDialog(tester, confirm: false);
+      expect(gateway.sentParams, isEmpty);
+
+      await send(tester);
+
+      expect(gateway.sentParams.single.minForce, 10);
+      expect(find.byKey(const Key('params_mismatch')), findsNothing);
+      await disposeApp(tester);
+    });
+
+    testWidgets('avisa quando o controlador devolve valores diferentes dos enviados', (tester) async {
+      final gateway = SpyGateway()..ackFor = (sent) => sent.withField(DeviceParamField.minForce, 12);
+      await pumpApp(tester, gateway);
+      await connect(tester);
+      await goTo(tester, AppDestination.deviceParams);
+      await tester.enterText(find.byKey(const Key('param_minForce')), '10');
+      await tester.pump();
+
+      await send(tester);
+
+      expect(find.byKey(const Key('params_mismatch')), findsOneWidget);
+      expect(find.textContaining('Força mínima: enviado 10, devolvido 12'), findsOneWidget);
+      expect(fieldText(tester, 'param_minForce'), '12', reason: 'a tela passa a mostrar o valor devolvido');
+      await disposeApp(tester);
+    });
+
+    testWidgets('sem paramsAck a tela avisa que o controlador não confirmou', (tester) async {
+      final gateway = SpyGateway()..dropParamsAck = true;
+      await pumpApp(tester, gateway);
+      await connect(tester);
+      await goTo(tester, AppDestination.deviceParams);
+
+      await send(tester);
+      expect(find.text('Aguardando confirmação…'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 4));
+
+      expect(find.textContaining('não confirmou o envio'), findsOneWidget);
+      expect(find.text('Enviar ao controlador'), findsOneWidget);
+      await disposeApp(tester);
+    });
+
+    testWidgets('perfis: salvar, alterar e carregar de volta', (tester) async {
+      final store = MemoryProfileStore();
+      final gateway = SpyGateway();
+      await pumpApp(tester, gateway, profileStore: store);
+      await goTo(tester, AppDestination.deviceParams);
+      await tester.enterText(find.byKey(const Key('param_minForce')), '12');
+      await tester.enterText(find.byKey(const Key('profile_name')), 'painel original');
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('profile_save')));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(store.profiles['painel original']!.params.minForce, 12);
+      expect(find.textContaining('Perfil "painel original" salvo'), findsOneWidget);
+
+      await tester.enterText(find.byKey(const Key('param_minForce')), '7');
+      await tester.pump();
+      expect(fieldText(tester, 'param_minForce'), '7');
+
+      await tester.tap(find.byKey(const Key('profile_select')));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text('painel original').last);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.byKey(const Key('profile_load')));
+      await tester.pump(const Duration(milliseconds: 600)); // o aviso anterior sai...
+      await tester.pump(const Duration(milliseconds: 600)); // ...e o novo entra no quadro seguinte
+
+      expect(fieldText(tester, 'param_minForce'), '12');
+      expect(find.textContaining('carregado no formulário (ainda não enviado)'), findsOneWidget);
+      expect(gateway.sentParams, isEmpty, reason: 'carregar um perfil nunca envia');
+      await disposeApp(tester);
+    });
+
+    testWidgets('perfis: nome inválido mostra o erro e não salva', (tester) async {
+      final store = MemoryProfileStore();
+      await pumpApp(tester, SpyGateway(), profileStore: store);
+      await goTo(tester, AppDestination.deviceParams);
+      await tester.enterText(find.byKey(const Key('profile_name')), '../fora');
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('profile_save')));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(store.profiles, isEmpty);
+      expect(find.textContaining('Use letras, números'), findsOneWidget);
+      await disposeApp(tester);
+    });
+
+    testWidgets('perfis: excluir pede confirmação', (tester) async {
+      final store = MemoryProfileStore()
+        ..profiles['p1'] = DeviceParamsProfile(
+          name: 'p1',
+          params: FakeMachineGateway.defaultParams,
+          savedAt: DateTime(2026),
+        );
+      await pumpApp(tester, SpyGateway(), profileStore: store);
+      await goTo(tester, AppDestination.deviceParams);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      await tester.tap(find.byKey(const Key('profile_select')));
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text('p1').last);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.byKey(const Key('profile_delete')));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('Excluir perfil?'), findsOneWidget);
+      await confirmDialog(tester, confirm: false);
+      expect(store.profiles.keys, ['p1']);
+
+      await tester.tap(find.byKey(const Key('profile_delete')));
+      await tester.pump(const Duration(milliseconds: 100));
+      await confirmDialog(tester, confirm: true);
+
+      expect(store.profiles, isEmpty);
+      await disposeApp(tester);
+    });
+  });
+
   group('parâmetros do dispositivo', () {
     testWidgets('valor fora da faixa mostra o erro e bloqueia o envio', (tester) async {
       await pumpApp(tester, SpyGateway());
@@ -265,7 +432,7 @@ void main() {
 
       await tester.tap(find.byKey(const Key('params_send')));
       await tester.pump(const Duration(milliseconds: 100));
-      expect(find.text('Enviar parâmetros?'), findsOneWidget);
+      expect(find.text('Enviar parâmetros ao controlador?'), findsOneWidget);
       await confirmDialog(tester, confirm: false);
       expect(gateway.deviceParams.minForce, 5, reason: 'cancelar não envia nada');
 
@@ -275,7 +442,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(gateway.deviceParams.minForce, 10);
-      expect(find.text('Parâmetros confirmados pelo controlador'), findsOneWidget);
+      expect(find.text('Controlador confirmou o envio (paramsAck)'), findsOneWidget);
       await disposeApp(tester);
     });
   });

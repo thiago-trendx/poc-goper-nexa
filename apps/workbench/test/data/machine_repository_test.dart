@@ -75,6 +75,23 @@ void main() {
       });
     });
 
+    test('ler o cache de parâmetros inicializa o SDK antes, uma única vez', () {
+      fakeAsync((async) {
+        final gateway = _CountingGateway();
+        final repository = MachineRepository(gateway);
+
+        repository.getDeviceParams();
+        repository.getControlParams();
+        repository.getDeviceParams();
+        async.flushMicrotasks();
+
+        expect(gateway.initializeCalls, 1);
+
+        repository.dispose();
+        async.flushMicrotasks();
+      });
+    });
+
     test('pollingStates e isPolling acompanham start/stop', () {
       fakeAsync((async) {
         final gateway = FakeMachineGateway(connectDelay: Duration.zero);

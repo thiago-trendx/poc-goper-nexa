@@ -26,6 +26,9 @@ class SpyGateway extends FakeMachineGateway {
   /// Intervalos pedidos em `startPolling`, na ordem.
   final List<int> intervals = [];
 
+  /// Parâmetros enviados por `sendDeviceParams`, na ordem.
+  final List<DeviceParams> sentParams = [];
+
   Future<void> _delayed(String name, Future<void> Function() command) async {
     calls.add('$name:start');
     if (commandDelay > Duration.zero) await Future<void>.delayed(commandDelay);
@@ -37,6 +40,12 @@ class SpyGateway extends FakeMachineGateway {
   Future<void> startPolling({int intervalMs = 200}) {
     intervals.add(intervalMs);
     return super.startPolling(intervalMs: intervalMs);
+  }
+
+  @override
+  Future<void> sendDeviceParams(DeviceParams params) {
+    sentParams.add(params);
+    return super.sendDeviceParams(params);
   }
 
   @override
