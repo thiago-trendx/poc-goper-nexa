@@ -120,4 +120,37 @@ void main() {
       _teardown(async, env.bloc, env.repository);
     });
   });
+
+
+  test('silentSeconds conta os segundos sem status e zera quando um chega', () {
+    fakeAsync((async) {
+      final env = _setup(async, intervalMs: 100);
+      async.elapse(const Duration(seconds: 2));
+      expect(env.bloc.state.silentSeconds, 0, reason: 'status chegando a cada 100 ms');
+
+      env.repository.stopPolling();
+      async.elapse(const Duration(seconds: 1));
+      async.elapse(const Duration(seconds: 3));
+      expect(env.bloc.state.silentSeconds, greaterThanOrEqualTo(3));
+      final silent = env.bloc.state.silentSeconds;
+
+      env.repository.startPolling(intervalMs: 100);
+      async.elapse(const Duration(milliseconds: 300));
+      expect(env.bloc.state.silentSeconds, 0, reason: 'o primeiro status novo zera o contador');
+      expect(silent, isNonZero);
+
+      _teardown(async, env.bloc, env.repository);
+    });
+  });
+
+  test('silentSeconds não sobe enquanto os status chegam', () {
+    fakeAsync((async) {
+      final env = _setup(async, intervalMs: 200);
+      async.elapse(const Duration(seconds: 10));
+
+      expect(env.bloc.state.silentSeconds, 0);
+
+      _teardown(async, env.bloc, env.repository);
+    });
+  });
 }

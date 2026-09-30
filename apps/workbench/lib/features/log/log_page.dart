@@ -4,10 +4,21 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../shared/widgets/feedback.dart';
 import 'log_cubit.dart';
+import 'log_exporter.dart';
 
 /// Log de pacotes tx/rx, conexão e erros, com as entradas mais novas no topo.
 class LogPage extends StatelessWidget {
   const LogPage({super.key});
+
+  Future<void> _save(BuildContext context, LogCubit cubit) async {
+    final exporter = context.read<LogExporter>();
+    try {
+      final path = await exporter.save(cubit.exportText());
+      if (context.mounted) showMessage(context, 'Log salvo em $path (copie com adb pull)');
+    } on Exception catch (e) {
+      if (context.mounted) showMessage(context, 'Falha ao salvar o log: $e', isError: true);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +45,12 @@ class LogPage extends StatelessWidget {
                           },
                     icon: const Icon(Icons.copy),
                     label: const Text('Copiar'),
+                  ),
+                  OutlinedButton.icon(
+                    key: const Key('log_save'),
+                    onPressed: lines.isEmpty ? null : () => _save(context, cubit),
+                    icon: const Icon(Icons.save_alt),
+                    label: const Text('Salvar .txt'),
                   ),
                   OutlinedButton.icon(
                     key: const Key('log_clear'),

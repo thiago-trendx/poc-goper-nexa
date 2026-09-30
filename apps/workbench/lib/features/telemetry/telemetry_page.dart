@@ -2,15 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../shared/widgets/feedback.dart';
+import '../connection/connection_bloc.dart';
 import 'telemetry_bloc.dart';
 
 /// Telemetria em tempo real. Gráficos e gravação em CSV entram na Fase 6.
 class TelemetryPage extends StatelessWidget {
   const TelemetryPage({super.key});
 
+  /// Segundos sem status, com o polling ligado, a partir dos quais a tela avisa.
+  static const silentWarningSeconds = 3;
+
   @override
   Widget build(BuildContext context) {
     final bloc = context.read<TelemetryBloc>();
+    final polling = context.select((ConnectionBloc b) => b.state.pollingActive);
     return BlocBuilder<TelemetryBloc, TelemetryState>(
       builder: (context, state) {
         final s = state.latest;
@@ -28,6 +33,29 @@ class TelemetryPage extends StatelessWidget {
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            if (!polling)
+              Card(
+                key: const Key('telemetry_frozen'),
+                color: Theme.of(context).colorScheme.tertiaryContainer,
+                child: const ListTile(
+                  leading: Icon(Icons.pause_circle_outline),
+                  title: Text('Polling parado: os valores abaixo estão congelados.'),
+                  subtitle: Text('Ligue o polling na tela Conexão para voltar a atualizar.'),
+                ),
+              ),
+            if (polling && state.silentSeconds >= silentWarningSeconds)
+              Card(
+                key: const Key('telemetry_silent'),
+                color: Theme.of(context).colorScheme.errorContainer,
+                child: ListTile(
+                  leading: const Icon(Icons.portable_wifi_off),
+                  title: Text('Sem resposta do controlador há ${state.silentSeconds} s.'),
+                  subtitle: const Text(
+                    'O polling pode estar rápido demais (na bancada, ~56 ms não obteve resposta). '
+                    'Escolha um intervalo maior na tela Conexão.',
+                  ),
+                ),
+              ),
             Section(
               title: 'Taxa de atualização',
               child: Wrap(
@@ -37,7 +65,7 @@ class TelemetryPage extends StatelessWidget {
                 children: [
                   Text(
                     key: const Key('telemetry_rate'),
-                    state.rateHz == null ? '— Hz' : '${state.rateHz!.toStringAsFixed(1)} Hz',
+                    !polling || state.rateHz == null ? '— Hz' : '${state.rateHz!.toStringAsFixed(1)} Hz',
                     style: Theme.of(context).textTheme.headlineMedium,
                   ),
                   FilledButton.icon(

@@ -23,11 +23,20 @@ class SpyGateway extends FakeMachineGateway {
 
   final List<int> forces = [];
 
+  /// Intervalos pedidos em `startPolling`, na ordem.
+  final List<int> intervals = [];
+
   Future<void> _delayed(String name, Future<void> Function() command) async {
     calls.add('$name:start');
     if (commandDelay > Duration.zero) await Future<void>.delayed(commandDelay);
     await command();
     calls.add('$name:done');
+  }
+
+  @override
+  Future<void> startPolling({int intervalMs = 200}) {
+    intervals.add(intervalMs);
+    return super.startPolling(intervalMs: intervalMs);
   }
 
   @override
@@ -47,5 +56,15 @@ class SpyGateway extends FakeMachineGateway {
   Future<void> stop() {
     calls.add('stop:start');
     return super.stop().whenComplete(() => calls.add('stop:done'));
+  }
+}
+
+/// Gateway cujo polling "liga" mas o controlador nunca responde (como em ~56 ms na bancada).
+class SilentGateway extends SpyGateway {
+  SilentGateway() : super();
+
+  @override
+  Future<void> startPolling({int intervalMs = 200}) async {
+    intervals.add(intervalMs); // aceita o comando, mas não emite nenhum status
   }
 }

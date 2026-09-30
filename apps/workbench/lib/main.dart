@@ -18,8 +18,10 @@ MachineGateway _gatewayFromEnvironment() {
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  final gateway = _gatewayFromEnvironment();
   runApp(WorkbenchApp(
-    gateway: _gatewayFromEnvironment(),
+    gateway: gateway,
     limits: SafetyLimits.fromEnvironment(),
+    simulated: gateway is FakeMachineGateway,
   ));
 }

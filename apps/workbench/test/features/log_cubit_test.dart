@@ -82,6 +82,79 @@ void main() {
     await cubit.close();
   });
 
+  group('STATUS', () {
+    DeviceStatus status({int distance = 0, int pullNum = 0, double temperature = 27, int monotonic = 1}) =>
+        DeviceStatus(
+          run: RunState.stop,
+          mode: ForceMode.standard,
+          force: 0,
+          realForce: 0,
+          speed: 0,
+          distance: distance,
+          pullNum: pullNum,
+          errorCode: 0,
+          temperature: temperature,
+          liftMotorStatus: 0,
+          liftMotorError1: 0,
+          liftMotorError2: 0,
+          verityCodeError: 0,
+          tsMonotonicMs: monotonic,
+          tsEpochMs: 1750000000000 + monotonic,
+        );
+
+    test('registra a primeira leitura com todos os campos', () async {
+      final cubit = build();
+      events.add(status(distance: 1));
+      await flush();
+
+      expect(
+        cubit.state.single.text,
+        'STATUS STOP modo=STANDARD força=0 real=0 vel=0.0 curso=1 rep=0 erro=0 motores=0/0/0 verif=0 temp=27.0',
+      );
+      await cubit.close();
+    });
+
+    test('ignora status repetidos, mesmo com temperatura e relógios diferentes', () async {
+      final cubit = build();
+      events
+        ..add(status(distance: 1, monotonic: 1))
+        ..add(status(distance: 1, temperature: 27.4, monotonic: 200))
+        ..add(status(distance: 1, temperature: 27.8, monotonic: 400));
+      await flush();
+
+      expect(cubit.state, hasLength(1));
+      await cubit.close();
+    });
+
+    test('registra de novo quando curso ou repetições mudam (cabo movendo)', () async {
+      final cubit = build();
+      events
+        ..add(status(distance: 1))
+        ..add(status(distance: 12, monotonic: 200))
+        ..add(status(distance: 12, pullNum: 1, monotonic: 400));
+      await flush();
+
+      expect(cubit.state.map((l) => l.text), [
+        contains('curso=1 rep=0'),
+        contains('curso=12 rep=0'),
+        contains('curso=12 rep=1'),
+      ]);
+      await cubit.close();
+    });
+
+    test('clear faz a próxima leitura ser registrada de novo', () async {
+      final cubit = build();
+      events.add(status(distance: 1));
+      await flush();
+      cubit.clear();
+      events.add(status(distance: 1, monotonic: 200));
+      await flush();
+
+      expect(cubit.state, hasLength(1));
+      await cubit.close();
+    });
+  });
+
   test('clear esvazia o log', () async {
     final cubit = build();
     events.add(const LogEntry(direction: LogDirection.tx, packetType: 'CONTROL', tsEpochMs: 1));

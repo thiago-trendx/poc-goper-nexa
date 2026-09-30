@@ -19,6 +19,12 @@ class EmergencyStopButton extends StatelessWidget {
     final errorColor = Theme.of(context).colorScheme.error;
     try {
       await repository.stop();
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(
+          duration: Duration(seconds: 1),
+          content: Text('STOP enviado'),
+        ));
     } on MachineException catch (e) {
       messenger.showSnackBar(
         SnackBar(

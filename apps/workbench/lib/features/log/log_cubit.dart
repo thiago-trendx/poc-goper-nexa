@@ -25,6 +25,7 @@ class LogCubit extends Cubit<List<LogLine>> {
     _subscriptions = [
       _repository.logs.listen(_onPacket),
       _repository.connections.listen(_onConnection),
+      _repository.statuses.listen(_onStatus),
       _repository.eventErrors.listen((e) => _add('Erro no canal de eventos: $e')),
     ];
   }
@@ -33,6 +34,7 @@ class LogCubit extends Cubit<List<LogLine>> {
   final int maxEntries;
   final int Function() _nowMs;
   late final List<StreamSubscription<Object?>> _subscriptions;
+  DeviceStatus? _lastLoggedStatus;
 
   void _onPacket(LogEntry entry) {
     final direction = entry.direction == LogDirection.tx ? 'TX' : 'RX';
@@ -46,12 +48,44 @@ class LogCubit extends Cubit<List<LogLine>> {
     _add('Conexão ${event.state.name}$port$reason');
   }
 
+  /// Registra o status só quando algo mudou além da temperatura e dos relógios: assim o log
+  /// mostra o movimento do cabo, os erros e as mudanças de estado sem uma linha por ciclo.
+  void _onStatus(DeviceStatus status) {
+    final previous = _lastLoggedStatus;
+    if (previous != null && _sameReading(previous, status)) return;
+    _lastLoggedStatus = status;
+    _add(
+      'STATUS ${status.run.wire} modo=${status.mode.wire} força=${status.force} real=${status.realForce} '
+      'vel=${status.speed.toStringAsFixed(1)} curso=${status.distance} rep=${status.pullNum} '
+      'erro=${status.errorCode} motores=${status.liftMotorStatus}/${status.liftMotorError1}/${status.liftMotorError2} '
+      'verif=${status.verityCodeError} temp=${status.temperature.toStringAsFixed(1)}',
+      tsEpochMs: status.tsEpochMs,
+    );
+  }
+
+  static bool _sameReading(DeviceStatus a, DeviceStatus b) =>
+      a.run == b.run &&
+      a.mode == b.mode &&
+      a.force == b.force &&
+      a.realForce == b.realForce &&
+      a.speed == b.speed &&
+      a.distance == b.distance &&
+      a.pullNum == b.pullNum &&
+      a.errorCode == b.errorCode &&
+      a.liftMotorStatus == b.liftMotorStatus &&
+      a.liftMotorError1 == b.liftMotorError1 &&
+      a.liftMotorError2 == b.liftMotorError2 &&
+      a.verityCodeError == b.verityCodeError;
+
   void _add(String text, {int? tsEpochMs}) {
     final lines = [...state, LogLine(tsEpochMs: tsEpochMs ?? _nowMs(), text: text)];
     emit(lines.length > maxEntries ? lines.sublist(lines.length - maxEntries) : lines);
   }
 
-  void clear() => emit(const []);
+  void clear() {
+    _lastLoggedStatus = null;
+    emit(const []);
+  }
 
   /// Texto pronto para exportar, uma linha por entrada com o horário em ISO 8601 (UTC).
   String exportText() => state

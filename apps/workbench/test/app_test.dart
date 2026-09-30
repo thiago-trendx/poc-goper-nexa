@@ -1,16 +1,33 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:poc_goper_nexa/app.dart';
+import 'package:poc_goper_nexa/features/log/log_exporter.dart';
 import 'package:poc_goper_nexa/shared/safety/safety_limits.dart';
 import 'package:poc_goper_nexa/shared/widgets/emergency_stop_button.dart';
 import 'package:sdk850_bridge/sdk850_bridge.dart';
 
 import 'helpers/spy_gateway.dart';
 
+class _FakeExporter implements LogExporter {
+  final saved = <String>[];
+  Exception? failure;
+
+  @override
+  Future<String> save(String text) async {
+    if (failure != null) throw failure!;
+    saved.add(text);
+    return '/sdcard/fake_log.txt';
+  }
+}
+
 Future<void> pumpApp(
   WidgetTester tester,
   SpyGateway gateway, {
   SafetyLimits limits = const SafetyLimits(),
+  LogExporter? logExporter,
+  bool simulated = false,
 }) async {
   tester.view.physicalSize = const Size(1920, 1080);
   tester.view.devicePixelRatio = 1.0;
@@ -19,6 +36,8 @@ Future<void> pumpApp(
     gateway: gateway,
     limits: limits,
     forceDebounce: const Duration(milliseconds: 10),
+    logExporter: logExporter ?? _FakeExporter(),
+    simulated: simulated,
   ));
   await tester.pump();
 }
@@ -82,6 +101,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
 
       expect(gateway.controlSnapshot.run, RunState.stop);
+      expect(find.text('STOP enviado'), findsOneWidget);
       await disposeApp(tester);
     });
 
@@ -304,6 +324,115 @@ void main() {
     });
   });
 
+  group('modo simulado', () {
+    testWidgets('a barra avisa que o app está simulado', (tester) async {
+      await pumpApp(tester, SpyGateway(), simulated: true);
+
+      expect(find.byKey(const Key('simulated_chip')), findsOneWidget);
+      expect(find.textContaining('SIMULADO'), findsOneWidget);
+      await disposeApp(tester);
+    });
+
+    testWidgets('com a máquina real não aparece o aviso', (tester) async {
+      await pumpApp(tester, SpyGateway());
+
+      expect(find.byKey(const Key('simulated_chip')), findsNothing);
+      await disposeApp(tester);
+    });
+  });
+
+  group('diagnóstico do polling', () {
+    testWidgets('avisa quando o controlador fica mudo com o polling ligado', (tester) async {
+      final gateway = SilentGateway();
+      await pumpApp(tester, gateway);
+      await connect(tester);
+      await goTo(tester, AppDestination.telemetry);
+      expect(find.byKey(const Key('telemetry_silent')), findsNothing);
+
+      await tester.pump(const Duration(seconds: 4));
+
+      expect(find.byKey(const Key('telemetry_silent')), findsOneWidget);
+      expect(find.textContaining('Sem resposta do controlador'), findsOneWidget);
+      expect(find.byKey(const Key('telemetry_frozen')), findsNothing, reason: 'o polling está ligado');
+      await disposeApp(tester);
+    });
+
+    testWidgets('não avisa quando as respostas chegam', (tester) async {
+      await pumpApp(tester, SpyGateway());
+      await connect(tester);
+      await goTo(tester, AppDestination.telemetry);
+
+      await tester.pump(const Duration(seconds: 5));
+
+      expect(find.byKey(const Key('telemetry_silent')), findsNothing);
+      await disposeApp(tester);
+    });
+
+    testWidgets('o seletor oferece os intervalos e religa o polling com o escolhido', (tester) async {
+      final gateway = SpyGateway();
+      await pumpApp(tester, gateway);
+      await connect(tester);
+      for (final ms in [200, 150, 120, 100, 80, 70, 60, 50]) {
+        expect(find.byKey(Key('interval_$ms')), findsOneWidget, reason: '$ms ms');
+      }
+
+      await tester.tap(find.byKey(const Key('polling_switch')));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.tap(find.byKey(const Key('interval_80')));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.tap(find.byKey(const Key('polling_switch')));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(gateway.intervals, [200, 80]);
+      await disposeApp(tester);
+    });
+
+    testWidgets('com o polling ligado o intervalo não pode ser trocado', (tester) async {
+      final gateway = SpyGateway();
+      await pumpApp(tester, gateway);
+      await connect(tester);
+
+      await tester.tap(find.byKey(const Key('interval_100')));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(tester.widget<ChoiceChip>(find.byKey(const Key('interval_200'))).selected, isTrue);
+      expect(tester.widget<ChoiceChip>(find.byKey(const Key('interval_100'))).selected, isFalse);
+      await disposeApp(tester);
+    });
+  });
+
+  group('polling', () {
+    testWidgets('o switch liga e desliga o polling e a telemetria congela', (tester) async {
+      final gateway = SpyGateway();
+      await pumpApp(tester, gateway);
+      await connect(tester);
+      expect(gateway.isPolling, isTrue);
+
+      await tester.tap(find.byKey(const Key('polling_switch')));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(gateway.isPolling, isFalse);
+      expect(tester.widget<Switch>(find.byKey(const Key('polling_switch'))).value, isFalse);
+
+      await goTo(tester, AppDestination.telemetry);
+      expect(find.byKey(const Key('telemetry_frozen')), findsOneWidget);
+      expect(tester.widget<Text>(find.byKey(const Key('telemetry_rate'))).data, '— Hz');
+      await tester.pump(const Duration(seconds: 2));
+      expect(tester.widget<Text>(find.byKey(const Key('telemetry_rate'))).data, '— Hz');
+
+      await goTo(tester, AppDestination.connection);
+      await tester.tap(find.byKey(const Key('polling_switch')));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(gateway.isPolling, isTrue);
+      await goTo(tester, AppDestination.telemetry);
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.byKey(const Key('telemetry_frozen')), findsNothing);
+      expect(tester.widget<Text>(find.byKey(const Key('telemetry_rate'))).data, endsWith('Hz'));
+      await goTo(tester, AppDestination.connection);
+      expect(tester.widget<Switch>(find.byKey(const Key('polling_switch'))).value, isTrue);
+      await disposeApp(tester);
+    });
+  });
+
   group('telemetria, firmware e log', () {
     testWidgets('a telemetria mostra a taxa medida depois de conectar', (tester) async {
       await pumpApp(tester, SpyGateway());
@@ -336,6 +465,33 @@ void main() {
       );
       await tester.pump(const Duration(seconds: 3));
       expect(tester.widget<Text>(find.byKey(const Key('firmware_status'))).data, contains('Desligue e religue'));
+      await disposeApp(tester);
+    });
+
+    testWidgets('o log pode ser salvo em arquivo e mostra o caminho', (tester) async {
+      final exporter = _FakeExporter();
+      await pumpApp(tester, SpyGateway(), logExporter: exporter);
+      await connect(tester);
+      await goTo(tester, AppDestination.log);
+
+      await tester.tap(find.byKey(const Key('log_save')));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(exporter.saved.single, contains('Conexão connected (/dev/ttyFAKE0)'));
+      expect(find.textContaining('/sdcard/fake_log.txt'), findsOneWidget);
+      await disposeApp(tester);
+    });
+
+    testWidgets('falha ao salvar o log aparece na tela', (tester) async {
+      final exporter = _FakeExporter()..failure = const FileSystemException('sem espaço');
+      await pumpApp(tester, SpyGateway(), logExporter: exporter);
+      await connect(tester);
+      await goTo(tester, AppDestination.log);
+
+      await tester.tap(find.byKey(const Key('log_save')));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.textContaining('Falha ao salvar o log'), findsOneWidget);
       await disposeApp(tester);
     });
 

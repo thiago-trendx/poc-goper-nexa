@@ -17,6 +17,10 @@ class _ConnectionPageState extends State<ConnectionPage> {
   final _portController = TextEditingController(text: '/dev/ttyUSB0');
   int _intervalMs = 200;
 
+  /// Do mais lento ao mais rápido. Na bancada o controlador respondeu bem a 200 e 100 ms e não
+  /// respondeu a ~56 ms; os valores intermediários servem para achar o limite (pergunta 1).
+  static const _intervals = [200, 150, 120, 100, 80, 70, 60, 50];
+
   @override
   void initState() {
     super.initState();
@@ -108,15 +112,17 @@ class _ConnectionPageState extends State<ConnectionPage> {
                 runSpacing: 12,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  SegmentedButton<int>(
-                    segments: const [
-                      ButtonSegment(value: 200, label: Text('200 ms')),
-                      ButtonSegment(value: 100, label: Text('100 ms')),
-                      ButtonSegment(value: 50, label: Text('50 ms')),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      for (final ms in _intervals)
+                        ChoiceChip(
+                          key: Key('interval_$ms'),
+                          label: Text('$ms ms'),
+                          selected: _intervalMs == ms,
+                          onSelected: state.pollingActive ? null : (_) => setState(() => _intervalMs = ms),
+                        ),
                     ],
-                    selected: {_intervalMs},
-                    onSelectionChanged:
-                        state.pollingActive ? null : (value) => setState(() => _intervalMs = value.first),
                   ),
                   Switch(
                     key: const Key('polling_switch'),

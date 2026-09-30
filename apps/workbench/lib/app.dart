@@ -16,6 +16,7 @@ import 'features/firmware/firmware_page.dart';
 import 'features/lift_motor/lift_motor_bloc.dart';
 import 'features/lift_motor/lift_motor_page.dart';
 import 'features/log/log_cubit.dart';
+import 'features/log/log_exporter.dart';
 import 'features/log/log_page.dart';
 import 'features/telemetry/telemetry_bloc.dart';
 import 'features/telemetry/telemetry_page.dart';
@@ -29,17 +30,25 @@ class WorkbenchApp extends StatelessWidget {
     required this.gateway,
     this.limits = const SafetyLimits(),
     this.forceDebounce = const Duration(milliseconds: 150),
+    this.logExporter = const FileLogExporter(),
+    this.simulated = false,
   });
 
   final MachineGateway gateway;
   final SafetyLimits limits;
   final Duration forceDebounce;
+  final LogExporter logExporter;
+
+  /// `true` quando o gateway é o falso: a barra do app fica âmbar e mostra "SIMULADO", para
+  /// ninguém confundir os valores simulados com os da máquina.
+  final bool simulated;
 
   @override
   Widget build(BuildContext context) {
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider<SafetyLimits>.value(value: limits),
+        RepositoryProvider<LogExporter>.value(value: logExporter),
         RepositoryProvider<MachineRepository>(
           create: (_) => MachineRepository(gateway),
           dispose: (repository) => unawaited(repository.dispose()),
@@ -87,7 +96,7 @@ class WorkbenchApp extends StatelessWidget {
           title: 'Workbench 850',
           debugShowCheckedModeBanner: false,
           theme: ThemeData(colorSchemeSeed: Colors.indigo, useMaterial3: true),
-          home: const _SafetyLifecycleGuard(child: HomeShell()),
+          home: _SafetyLifecycleGuard(child: HomeShell(simulated: simulated)),
         ),
       ),
     );
@@ -153,7 +162,9 @@ enum AppDestination {
 /// Ao trocar de destino a tela anterior é descartada, o que dispara o `stop()` de
 /// segurança da tela de controle.
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key});
+  const HomeShell({super.key, this.simulated = false});
+
+  final bool simulated;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -167,8 +178,18 @@ class _HomeShellState extends State<HomeShell> {
     final connected = context.select((ConnectionBloc b) => b.state.isConnected);
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: widget.simulated ? Colors.amber.shade300 : null,
         title: Text(_selected.label),
         actions: [
+          if (widget.simulated)
+            const Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: Chip(
+                key: Key('simulated_chip'),
+                avatar: Icon(Icons.science, size: 18),
+                label: Text('SIMULADO — não é a máquina'),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Chip(
