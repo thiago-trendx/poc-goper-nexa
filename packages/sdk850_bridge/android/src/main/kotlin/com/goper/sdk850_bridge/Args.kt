@@ -41,6 +41,30 @@ object Args {
         throw BridgeException(BridgeException.INVALID_ARGS, "Argumento \"$key\" deve ser booleano")
     }
 
+    /**
+     * Lê os 11 campos de `DeviceParams` de [args]. Tudo ou nada: falta de campo ou tipo errado
+     * vira `INVALID_ARGS`; valor fora da faixa do Javadoc vira `OUT_OF_RANGE` listando os campos.
+     */
+    fun deviceParams(args: Map<*, *>?): ParamsValues {
+        val values = LinkedHashMap<String, Int>()
+        for (range in ParamRanges.all) {
+            val value = args?.get(range.key)
+            if (value !is Number) {
+                throw BridgeException(BridgeException.INVALID_ARGS, "Campo \"${range.key}\" deve ser um inteiro")
+            }
+            values[range.key] = value.toInt()
+        }
+        val invalid = ParamRanges.all.filter { values.getValue(it.key) !in it.min..it.max }
+        if (invalid.isNotEmpty()) {
+            throw BridgeException(
+                BridgeException.OUT_OF_RANGE,
+                "Fora da faixa: " + invalid.joinToString(", ") { "${it.key} (${it.min} a ${it.max})" },
+                invalid.map { it.key }
+            )
+        }
+        return ParamsValues.fromMap(values)
+    }
+
     fun pollingInterval(args: Map<*, *>?): Int {
         val ms = optionalInt(args, "intervalMs") ?: DEFAULT_POLLING_MS
         if (ms < MIN_POLLING_MS || ms > MAX_POLLING_MS) {

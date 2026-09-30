@@ -121,6 +121,19 @@ class FakePort : SdkPort {
         calls += "markStop"
     }
 
+    val paramsBytes = byteArrayOf(0x0A)
+    var params = defaultParams()
+    val applied = mutableListOf<ParamsValues>()
+
+    override fun deviceParams(): ParamsValues = params
+
+    override fun paramsCommand(values: ParamsValues): ByteArray {
+        applied += values
+        params = values
+        calls += "applyParams"
+        return paramsBytes
+    }
+
     override fun deviceInfoQuery(): ByteArray = infoBytes
 
     override fun commandName(data: ByteArray): String =
@@ -134,3 +147,17 @@ class FakePort : SdkPort {
 fun sampleStatus(): DeviceStatus = DeviceStatus()
 
 fun sampleInfo(): DeviceInfo = DeviceInfo("SW-1", 41, "P-9")
+
+fun defaultParams() = ParamsValues(
+    minForce = 5,
+    maxForce = 100,
+    inactiveForce = 5,
+    maxLength = 200,
+    ratedSpeed = 1000,
+    ropeGuideDiameter = 10,
+    orginMinDistance = 5,
+    orginMaxDistance = 50,
+    velocityRange = 20,
+    torqueVariationCycle = 50,
+    torqueCoefficient = 10
+)

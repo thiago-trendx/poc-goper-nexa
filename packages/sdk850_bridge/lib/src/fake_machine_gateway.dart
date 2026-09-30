@@ -77,6 +77,13 @@ class FakeMachineGateway implements MachineGateway {
   /// Quando `true`, ajuste e autoteste dos motores terminam com `timeout` em vez de `completed`.
   bool simulateLiftMotorTimeout = false;
 
+  /// Quando informado, o controlador "devolve" estes valores em vez dos enviados em
+  /// `sendDeviceParams` (simula um controlador que ajusta ou recusa campos).
+  DeviceParams Function(DeviceParams sent)? ackFor;
+
+  /// Quando `true`, `sendDeviceParams` é aceito mas o `paramsAck` nunca chega.
+  bool dropParamsAck = false;
+
   static const _monotonicBaseMs = 1000000;
   static const _epochBaseMs = 1750000000000;
   static const _liftMargin = Duration(seconds: 4);
@@ -244,8 +251,9 @@ class FakeMachineGateway implements MachineGateway {
         'Fora da faixa: ${errors.keys.map((f) => f.key).join(', ')}',
       );
     }
-    _params = params;
-    Timer(Duration.zero, () => _emit(ParamsAckEvent(params)));
+    final returned = ackFor?.call(params) ?? params;
+    _params = returned; // o SDK também guarda no cache o que o controlador devolve
+    if (!dropParamsAck) Timer(Duration.zero, () => _emit(ParamsAckEvent(returned)));
   }
 
   @override

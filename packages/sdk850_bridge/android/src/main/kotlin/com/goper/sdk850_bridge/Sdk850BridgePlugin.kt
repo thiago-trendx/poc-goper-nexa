@@ -72,6 +72,13 @@ class Sdk850BridgePlugin(
 
                 "getConnectionInfo" -> result.success(controller.connectionInfo())
 
+                "getDeviceParams" -> result.success(controller.deviceParams())
+
+                "sendDeviceParams" -> {
+                    controller.sendDeviceParams(Args.deviceParams(args))
+                    result.success(null)
+                }
+
                 "startPolling" -> {
                     controller.startPolling(Args.pollingInterval(args))
                     result.success(null)

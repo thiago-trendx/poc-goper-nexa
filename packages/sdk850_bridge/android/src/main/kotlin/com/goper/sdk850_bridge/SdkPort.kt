@@ -14,6 +14,9 @@ interface PortListener {
     fun onStatus(status: DeviceStatus)
     fun onDeviceInfo(info: DeviceInfo)
 
+    /** Resposta `SEND_PARAMS`: os parâmetros que o controlador devolveu. */
+    fun onParamsAck(values: ParamsValues)
+
     /** Qualquer pacote recebido, pelo nome do tipo (`CONTROL`, `DEVICE_INFO`…), para o log. */
     fun onPacket(typeName: String)
 }
@@ -51,6 +54,18 @@ interface SdkPort {
 
     /** Coloca `ControlParams.run` em `STOP`; o envio é feito por [controlCommand] + [send]. */
     fun markStop()
+
+    /**
+     * `DeviceParams` guardados no `DeviceManager`. É o cache local (SharedPreferences), que o SDK
+     * também atualiza com o retorno de `SEND_PARAMS`; **não** é uma leitura do controlador.
+     */
+    fun deviceParams(): ParamsValues
+
+    /**
+     * Grava [values] nos `DeviceParams` do `DeviceManager` (cada setter persiste na hora, antes de
+     * o controlador confirmar) e devolve o `Cmd.sendParams` correspondente.
+     */
+    fun paramsCommand(values: ParamsValues): ByteArray
 
     /** `Cmd.quaryDeviceInfo` (a grafia é do SDK). */
     fun deviceInfoQuery(): ByteArray

@@ -53,6 +53,9 @@ object Mappers {
             put("tsEpochMs", tsEpochMs)
         }
 
+    /** Campos de `DeviceParams` no mesmo nível do `type`, como no contrato. */
+    fun paramsAck(values: ParamsValues): Map<String, Any?> = linkedMapOf<String, Any?>("type" to "paramsAck") + values.toMap()
+
     fun connectionInfo(state: String, portPath: String?): Map<String, Any?> =
         mapOf("state" to state, "portPath" to portPath)
 

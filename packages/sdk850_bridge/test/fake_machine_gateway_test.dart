@@ -279,6 +279,34 @@ void main() {
       });
     });
 
+    test('ackFor faz o controlador devolver valores diferentes dos enviados', () {
+      fakeAsync((async) {
+        final c = _connected(async);
+        final g = c.gateway..ackFor = (sent) => sent.withField(DeviceParamField.minForce, 12);
+        final sent = g.deviceParams.withField(DeviceParamField.minForce, 10);
+
+        g.sendDeviceParams(sent);
+        async.flushMicrotasks();
+        async.elapse(Duration.zero);
+
+        expect(c.events.whereType<ParamsAckEvent>().single.params.minForce, 12);
+        expect(g.deviceParams.minForce, 12, reason: 'o cache guarda o que o controlador devolveu');
+      });
+    });
+
+    test('dropParamsAck aceita o envio mas nunca confirma', () {
+      fakeAsync((async) {
+        final c = _connected(async);
+        final g = c.gateway..dropParamsAck = true;
+
+        g.sendDeviceParams(g.deviceParams.withField(DeviceParamField.minForce, 10));
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 5));
+
+        expect(c.events.whereType<ParamsAckEvent>(), isEmpty);
+      });
+    });
+
     test('getDeviceParams e getControlParams funcionam sem conexão', () async {
       final g = FakeMachineGateway();
       expect(await g.getDeviceParams(), FakeMachineGateway.defaultParams);

@@ -91,6 +91,26 @@ class MachineController(
 
     fun connectionInfo(): Map<String, Any?> = Mappers.connectionInfo(port.stateName(), port.currentPortPath())
 
+    // ---- Parâmetros do dispositivo ----
+
+    /**
+     * Parâmetros guardados no `DeviceManager` (cache local). O controlador não tem comando de
+     * leitura: ele só devolve seus parâmetros em resposta a um envio (evento `paramsAck`).
+     */
+    fun deviceParams(): Map<String, Any?> {
+        requireInitialized()
+        return port.deviceParams().toMap()
+    }
+
+    /**
+     * Envia [values] ao controlador. Só por ação explícita: nada aqui envia parâmetros ao
+     * conectar. A confirmação chega pelo evento `paramsAck`.
+     */
+    fun sendDeviceParams(values: ParamsValues) {
+        requireConnected()
+        port.send(port.paramsCommand(values))
+    }
+
     // ---- Polling e comandos ----
 
     /**
@@ -196,6 +216,8 @@ class MachineController(
         emit(Mappers.status(status, clock.monotonicMs(), clock.epochMs()))
 
     override fun onDeviceInfo(info: DeviceInfo) = emit(Mappers.deviceInfo(info))
+
+    override fun onParamsAck(values: ParamsValues) = emit(Mappers.paramsAck(values))
 
     override fun onPacket(typeName: String) {
         if (logEnabled) emit(Mappers.log("rx", typeName, null, clock.epochMs()))

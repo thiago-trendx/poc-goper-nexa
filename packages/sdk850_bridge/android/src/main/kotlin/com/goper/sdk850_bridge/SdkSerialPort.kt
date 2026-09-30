@@ -6,6 +6,7 @@ import com.sunway.sdk850.base.paser.SerialPacket
 import com.sunway.sdk850.port.Cmd
 import com.sunway.sdk850.port.DeviceManager
 import com.sunway.sdk850.port.bean.DeviceInfo
+import com.sunway.sdk850.port.bean.DeviceParams
 import com.sunway.sdk850.port.bean.DeviceStatus
 import com.sunway.sdk850.port.bean.RunState
 import com.sunway.sdk850.port.bean.SerialPacketType
@@ -63,6 +64,9 @@ class SdkSerialPort : SdkPort {
                             listener.onDeviceInfo(it)
                         }
 
+                    SerialPacketType.SEND_PARAMS ->
+                        (serialPacket.getData() as? DeviceParams)?.let { listener.onParamsAck(it.toValues()) }
+
                     else -> Unit
                 }
             }
@@ -102,6 +106,38 @@ class SdkSerialPort : SdkPort {
     override fun markStop() {
         DeviceManager.getInstance().getControlParams().setRun(RunState.STOP)
     }
+
+    override fun deviceParams(): ParamsValues = DeviceManager.getInstance().getDeviceParams().toValues()
+
+    override fun paramsCommand(values: ParamsValues): ByteArray {
+        val params = DeviceManager.getInstance().getDeviceParams()
+        params.setMinForce(values.minForce)
+        params.setMaxForce(values.maxForce)
+        params.setInactiveForce(values.inactiveForce)
+        params.setMaxLength(values.maxLength)
+        params.setRatedSpeed(values.ratedSpeed)
+        params.setRopeGuideDiameter(values.ropeGuideDiameter)
+        params.setOrginMinDistance(values.orginMinDistance)
+        params.setOrginMaxDistance(values.orginMaxDistance)
+        params.setVelocityRange(values.velocityRange)
+        params.setTorqueVariationCycle(values.torqueVariationCycle)
+        params.setTorqueCoefficient(values.torqueCoefficient)
+        return Cmd.sendParams(params)
+    }
+
+    private fun DeviceParams.toValues() = ParamsValues(
+        minForce = getMinForce(),
+        maxForce = getMaxForce(),
+        inactiveForce = getInactiveForce(),
+        maxLength = getMaxLength(),
+        ratedSpeed = getRatedSpeed(),
+        ropeGuideDiameter = getRopeGuideDiameter(),
+        orginMinDistance = getOrginMinDistance(),
+        orginMaxDistance = getOrginMaxDistance(),
+        velocityRange = getVelocityRange(),
+        torqueVariationCycle = getTorqueVariationCycle(),
+        torqueCoefficient = getTorqueCoefficient()
+    )
 
     override fun deviceInfoQuery(): ByteArray = Cmd.quaryDeviceInfo()
 
