@@ -1,38 +1,50 @@
 package com.goper.sdk850_bridge
 
 import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 
-/** Sdk850BridgePlugin */
+/**
+ * Registra os canais do contrato (`sdk850_bridge/methods` e `sdk850_bridge/events`).
+ *
+ * Os métodos ainda não estão implementados: a ponte com o SDK chega na Fase 2.
+ * Até lá, toda chamada responde `notImplemented` e o Dart a converte em `MachineException`.
+ */
 class Sdk850BridgePlugin :
     FlutterPlugin,
-    MethodCallHandler {
-    // The MethodChannel that will the communication between Flutter and native Android
-    //
-    // This local reference serves to register the plugin with the Flutter Engine and unregister it
-    // when the Flutter Engine is detached from the Activity
-    private lateinit var channel: MethodChannel
+    MethodCallHandler,
+    EventChannel.StreamHandler {
+    private lateinit var methodChannel: MethodChannel
+    private lateinit var eventChannel: EventChannel
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
-        channel = MethodChannel(flutterPluginBinding.binaryMessenger, "sdk850_bridge")
-        channel.setMethodCallHandler(this)
+        methodChannel = MethodChannel(flutterPluginBinding.binaryMessenger, METHODS_CHANNEL)
+        methodChannel.setMethodCallHandler(this)
+        eventChannel = EventChannel(flutterPluginBinding.binaryMessenger, EVENTS_CHANNEL)
+        eventChannel.setStreamHandler(this)
     }
 
     override fun onMethodCall(
         call: MethodCall,
         result: Result
     ) {
-        if (call.method == "getPlatformVersion") {
-            result.success("Android ${android.os.Build.VERSION.RELEASE}")
-        } else {
-            result.notImplemented()
-        }
+        result.notImplemented()
     }
 
+    override fun onListen(arguments: Any?, events: EventChannel.EventSink?) = Unit
+
+    override fun onCancel(arguments: Any?) = Unit
+
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-        channel.setMethodCallHandler(null)
+        methodChannel.setMethodCallHandler(null)
+        eventChannel.setStreamHandler(null)
+    }
+
+    companion object {
+        const val METHODS_CHANNEL = "sdk850_bridge/methods"
+        const val EVENTS_CHANNEL = "sdk850_bridge/events"
     }
 }

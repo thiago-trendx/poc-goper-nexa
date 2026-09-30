@@ -27,5 +27,9 @@ Jira: história GOPER-5978 (subtarefas por fase, GOPER-5979 a 5986). Perguntas e
 tools/maven/publish_sdk850.sh                 # (re)publica o .aar em maven-repo/
 cd apps/workbench && flutter pub get && flutter analyze && flutter test
 cd apps/workbench && flutter build apk --debug
+cd packages/sdk850_bridge && flutter analyze && flutter test
+cd apps/workbench && flutter run --dart-define=GATEWAY=fake      # sem hardware (padrão)
+cd apps/workbench && flutter run --dart-define=GATEWAY=device    # máquina real (Fase 2 em diante)
 ```
+`--dart-define=MAX_FORCE_KG=<kg>` ajusta o limite de carga do app (padrão 30 kg). Decisões de cada fase: `docs/decisions/`.
 A propriedade `sdk850MavenUrl` (em `apps/workbench/android/gradle.properties`) define o repositório Maven; para o repositório interno (opção B) use `-Psdk850PublishUrl=` no script de publicação.

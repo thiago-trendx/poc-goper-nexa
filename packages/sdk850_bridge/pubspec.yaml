@@ -1,5 +1,5 @@
 name: sdk850_bridge
-description: "A new Flutter plugin project."
+description: "Ponte Flutter (somente Android) para o SDK 850 da máquina de força: modelos, contrato do canal, gateway real e gateway falso."
 version: 0.0.1
 homepage:
 
@@ -10,12 +10,13 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  plugin_platform_interface: ^2.0.2
+  equatable: ^2.0.7
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  fake_async: ^1.3.3
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
