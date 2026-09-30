@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/white"
+    android:orientation="vertical"
+    tools:context=".activity.TrainingActivity">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:layout_marginHorizontal="30dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+        <TextView
+            android:id="@+id/tv_port_state"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/black"
+            android:textSize="30sp"
+            android:text="串口状态: 未连接"/>
+
+        <TextView
+            android:id="@+id/tv_close"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:background="@drawable/shape_text_btn_bg"
+            android:paddingVertical="15dp"
+            android:paddingHorizontal="30dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/color_4169E1"
+            android:textSize="30sp"
+            android:text="关闭"/>
+
+        <TextView
+            android:id="@+id/tv_control_verion"
+            app:layout_constraintRight_toLeftOf="@+id/tv_close"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:layout_marginRight="50dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/black"
+            android:textSize="30sp"
+            android:text="控制器版本: --"/>
+
+        <TextView
+            android:id="@+id/tv_control_soft_num"
+            app:layout_constraintRight_toLeftOf="@+id/tv_control_verion"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:layout_marginRight="50dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/black"
+            android:textSize="30sp"
+            android:text="软件料号: --"/>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+
+    <!-- 重量  速度  行程  次数  错误码  NTC温度
+         升降电机1错误  升降电机2错误 校验码错误 升降电机状态  实时力值 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        app:layout_constraintTop_toBottomOf="@+id/llt_top"
+        android:orientation="horizontal"
+        android:layout_marginVertical="10dp"
+        android:layout_marginHorizontal="20px"
+        android:layout_height="wrap_content">
+
+        <TextView
+            android:id="@+id/btn_pull_num"
+            style="@style/ButtonStyle"
+            android:layout_height="120dp"
+            android:background="@drawable/shape_data_bg"
+            android:textColor="@color/black"
+            android:text="0 \n 次数" />
+
+        <TextView
+            android:id="@+id/btn_speed"
+            style="@style/ButtonStyle"
+            android:layout_height="120dp"
+            android:background="@drawable/shape_data_bg"
+            android:textColor="@color/black"
+            android:text="0 cm/s\n 速度" />
+
+        <TextView
+            android:id="@+id/btn_distance"
+            style="@style/ButtonStyle"
+            android:layout_height="120dp"
+            android:background="@drawable/shape_data_bg"
+            android:textColor="@color/black"
+            android:text="0 cm\n 行程" />
+
+        <TextView
+            android:id="@+id/btn_error_code"
+            style="@style/ButtonStyle"
+            android:layout_height="120dp"
+            android:background="@drawable/shape_error_bg"
+            android:textColor="@color/black"
+            android:text="0 \n 错误码" />
+
+        <TextView
+            android:id="@+id/btn_templeate"
+            style="@style/ButtonStyle"
+            android:layout_height="120dp"
+            android:background="@drawable/shape_data_bg"
+            android:textColor="@color/black"
+            android:text="0 °C\n NTC温度" />
+
+        <TextView
+            android:id="@+id/btn_real_force"
+            style="@style/ButtonStyle"
+            android:layout_height="120dp"
+            android:background="@drawable/shape_data_bg"
+            android:textColor="@color/black"
+            android:text="0 kg\n 最大力矩" />
+
+        <TextView
+            android:id="@+id/btn_motor_status"
+            style="@style/ButtonStyle"
+            android:layout_height="120dp"
+            android:background="@drawable/shape_data_bg"
+            android:textColor="@color/black"
+            android:text="00 \n 升降电机状态" />
+
+    </LinearLayout>
+
+    <!-- 公共的 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:orientation="horizontal"
+        android:layout_marginHorizontal="20dp"
+        android:layout_height="wrap_content">
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btn_mode1"
+            style="@style/ButtonStyle"
+            android:background="@drawable/selector_mode_bg"
+            android:text="标准模式" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btn_mode2"
+            style="@style/ButtonStyle"
+            android:background="@drawable/selector_mode_bg"
+            android:text="向心模式" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btn_mode3"
+            style="@style/ButtonStyle"
+            android:background="@drawable/selector_mode_bg"
+            android:text="离心模式" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btn_mode4"
+            style="@style/ButtonStyle"
+            android:background="@drawable/selector_mode_bg"
+            android:text="等速模式" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btn_mode5"
+            style="@style/ButtonStyle"
+            android:background="@drawable/selector_mode_bg"
+            android:text="弹力模式" />
+    </LinearLayout>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_marginHorizontal="20dp"
+        android:layout_height="match_parent">
+
+        <com.sunway.l850tdemo.custom_view.AdjustView
+            android:id="@+id/av_force"
+            android:layout_width="760dp"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintLeft_toLeftOf="parent"
+            android:background="@drawable/shape_bg_e2e2e2"
+            android:layout_margin="10dp"
+            app:leftText="阻力 -"
+            app:centerText="5 kg"
+            app:rightText="阻力 +" />
+
+        <com.sunway.l850tdemo.custom_view.AdjustView
+            android:id="@+id/av_velocity"
+            android:layout_width="760dp"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toBottomOf="@+id/av_force"
+            app:layout_constraintLeft_toLeftOf="parent"
+            android:background="@drawable/shape_bg_e2e2e2"
+            android:layout_marginHorizontal="10dp"
+            android:layout_marginTop="30dp"
+            app:leftText="等速系数 -"
+            app:centerText="5"
+            app:rightText="等速系数 +" />
+
+        <com.sunway.l850tdemo.custom_view.AdjustView
+            android:id="@+id/av_elastic"
+            android:layout_width="760dp"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toBottomOf="@+id/av_velocity"
+            app:layout_constraintLeft_toLeftOf="parent"
+            android:background="@drawable/shape_bg_e2e2e2"
+            android:layout_marginHorizontal="10dp"
+            android:layout_marginTop="30dp"
+            app:leftText="弹力系数 -"
+            app:centerText="5"
+            app:rightText="弹力系数 +" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btn_clear"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/av_elastic"
+            android:background="@drawable/selector_button_bg"
+            android:layout_marginHorizontal="10dp"
+            android:textSize="30sp"
+            android:textColor="@color/white"
+            android:layout_width="760dp"
+            android:layout_height="100dp"
+            android:layout_marginTop="30dp"
+            android:text="清除数据" />
+
+        <com.sunway.l850tdemo.custom_view.AdjustView
+            android:id="@+id/av_centripetal"
+            android:layout_width="760dp"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            android:background="@drawable/shape_bg_e2e2e2"
+            android:layout_marginHorizontal="10dp"
+            android:layout_marginTop="10dp"
+            app:leftText="向心力系数 -"
+            app:centerText="5"
+            app:rightText="向心力系数 +" />
+
+        <com.sunway.l850tdemo.custom_view.AdjustView
+            android:id="@+id/av_centrifugal"
+            android:layout_width="760dp"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toBottomOf="@+id/av_centripetal"
+            app:layout_constraintRight_toRightOf="parent"
+            android:background="@drawable/shape_bg_e2e2e2"
+            android:layout_marginHorizontal="10dp"
+            android:layout_marginTop="30dp"
+            app:leftText="离心力系数 -"
+            app:centerText="5"
+            app:rightText="离心力系数 +" />
+
+        <com.sunway.l850tdemo.custom_view.AdjustView
+            android:id="@+id/av_motor1"
+            android:layout_width="760dp"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toBottomOf="@+id/av_centrifugal"
+            app:layout_constraintRight_toRightOf="parent"
+            android:background="@drawable/shape_bg_e2e2e2"
+            android:layout_marginHorizontal="10dp"
+            android:layout_marginTop="30dp"
+            app:leftText="升降电机1 -"
+            app:centerText="3"
+            app:rightText="升降电机1 +" />
+
+        <com.sunway.l850tdemo.custom_view.AdjustView
+            android:id="@+id/av_motor2"
+            android:layout_width="760dp"
+            android:layout_height="wrap_content"
+            app:layout_constraintTop_toBottomOf="@+id/av_motor1"
+            app:layout_constraintRight_toRightOf="parent"
+            android:background="@drawable/shape_bg_e2e2e2"
+            android:layout_marginHorizontal="10dp"
+            android:layout_marginTop="30dp"
+            app:leftText="升降电机2 -"
+            app:centerText="3"
+            app:rightText="升降电机2 +" />
+
+        <TextView
+            android:id="@+id/tv_run_time"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            android:layout_marginTop="10dp"
+            android:layout_width="300dp"
+            android:layout_height="180dp"
+            android:background="@drawable/shape_data_bg"
+            android:gravity="center"
+            android:textColor="@color/black"
+            android:textSize="40sp"
+            android:text="00:00:00\n 运动时间" />
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/iv_start"
+            app:layout_constraintTop_toBottomOf="@+id/tv_run_time"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            android:background="@drawable/selector_button_bg"
+            android:src="@drawable/workout_start"
+            android:padding="60dp"
+            android:layout_marginTop="20dp"
+            android:layout_width="300dp"
+            android:layout_height="200dp"/>
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btn_origin_reset"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/iv_start"
+            android:background="@drawable/selector_button_bg"
+            android:textSize="30sp"
+            android:textColor="@color/white"
+            android:layout_width="300dp"
+            android:layout_height="90dp"
+            android:layout_marginTop="20dp"
+            android:text="原点重置" />
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btn_error_restore"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/btn_origin_reset"
+            android:background="@drawable/selector_button_bg"
+            android:textSize="30sp"
+            android:textColor="@color/white"
+            android:layout_width="300dp"
+            android:layout_height="90dp"
+            android:layout_marginTop="20dp"
+            android:text="错误复位" />
+
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+    <!--
+           开始/停止   模式切换   拉力设置  回力设置  等速系数 弹力系数
+           保护模式  次数清零  座椅挡位  悬臂挡位 力的加减速时间  力的校准系数 长度校准系数
+       -->
+
+</LinearLayout>

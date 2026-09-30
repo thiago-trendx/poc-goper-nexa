@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:background="@color/white"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <TextView
+        android:id="@+id/tv_close"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        android:background="@drawable/shape_text_btn_bg"
+        android:layout_marginRight="30dp"
+        android:layout_marginTop="20dp"
+        android:paddingVertical="15dp"
+        android:paddingHorizontal="30dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="@color/color_4169E1"
+        android:textSize="30sp"
+        android:text="关闭"/>
+
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/btn_self_motor"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        android:background="@drawable/selector_button_bg"
+        android:layout_marginHorizontal="30dp"
+        android:textSize="30sp"
+        android:textColor="@color/white"
+        android:layout_width="860dp"
+        android:layout_height="100dp"
+        android:layout_marginTop="30dp"
+        android:text="升降电机自检" />
+    
+    <!--
+    int minForce = 5; // 最小拉力 5-20（KG）
+    int maxForce = 100;  //最大拉力  50 - 120（KG）
+    int inactiveForce = 2;  //空闲拉力  2 - 20 （KG）
+    int maxLength = 65;  //最大拉绳长度  10 - 255 （CM）
+
+    int ratedSpeed = 150 ; // 额定转速 Rpm 1 - 2000
+    int ropeGuideDiameter = 14 ; // 绳轨直径 CM  1 - 255
+
+    int orginMinDistance = 2 ; // 原点最小距离  cm  1 - 50
+    int orginMaxDistance = 5 ; // 原点最大距离  cm  2 - 100
+    int velocityRange = 10 ; // 等速系数范围   0 - 50
+    int torqueVariationCycle = 10 ; // 力矩变化周期系数   0 - 100
+    int torqueCoefficient = 10 ; // 力矩变化系数   1 - 20
+    
+    -->
+
+    <com.sunway.l850tdemo.custom_view.AdjustView
+        android:id="@+id/av_min_force"
+        android:layout_width="860dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@+id/btn_self_motor"
+        app:layout_constraintLeft_toLeftOf="@+id/btn_self_motor"
+        android:background="@drawable/shape_bg_e2e2e2"
+        android:layout_marginTop="50dp"
+        app:leftText="最小拉力 -"
+        app:centerText="5 kg"
+        app:rightText="最小拉力 +" />
+
+    <com.sunway.l850tdemo.custom_view.AdjustView
+        android:id="@+id/av_max_force"
+        android:layout_width="860dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@+id/av_min_force"
+        app:layout_constraintLeft_toLeftOf="@+id/btn_self_motor"
+        android:background="@drawable/shape_bg_e2e2e2"
+        android:layout_marginTop="20dp"
+        app:leftText="最大拉力 -"
+        app:centerText="100 kg"
+        app:rightText="最大拉力 +" />
+
+    <com.sunway.l850tdemo.custom_view.AdjustView
+        android:id="@+id/av_inactive_force"
+        android:layout_width="860dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@+id/av_max_force"
+        app:layout_constraintLeft_toLeftOf="@+id/btn_self_motor"
+        android:background="@drawable/shape_bg_e2e2e2"
+        android:layout_marginTop="20dp"
+        app:leftText="空闲拉力 -"
+        app:centerText="5 kg"
+        app:rightText="空闲拉力 +" />
+    
+    <com.sunway.l850tdemo.custom_view.AdjustView
+        android:id="@+id/av_max_length"
+        android:layout_width="860dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@+id/av_inactive_force"
+        app:layout_constraintLeft_toLeftOf="@+id/btn_self_motor"
+        android:background="@drawable/shape_bg_e2e2e2"
+        android:layout_marginTop="20dp"
+        app:leftText="最大拉绳长度 -"
+        app:centerText="100 cm"
+        app:rightText="最大拉绳长度 +" />
+
+    <com.sunway.l850tdemo.custom_view.AdjustView
+        android:id="@+id/av_rated_speed"
+        android:layout_width="860dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@+id/av_max_length"
+        app:layout_constraintLeft_toLeftOf="@+id/btn_self_motor"
+        android:background="@drawable/shape_bg_e2e2e2"
+        android:layout_marginTop="20dp"
+        app:leftText="额定转速 -"
+        app:centerText="100 Rpm"
+        app:rightText="额定转速 +" />
+    
+    <com.sunway.l850tdemo.custom_view.AdjustView
+        android:id="@+id/av_rope_guide_diameter"
+        android:layout_width="860dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@+id/av_rated_speed"
+        app:layout_constraintLeft_toLeftOf="@+id/btn_self_motor"
+        android:background="@drawable/shape_bg_e2e2e2"
+        android:layout_marginTop="20dp"
+        app:leftText="绳轨直径 -"
+        app:centerText="100 cm"
+        app:rightText="绳轨直径 +" />
+
+    <com.sunway.l850tdemo.custom_view.AdjustView
+        android:id="@+id/av_origin_min"
+        android:layout_width="860dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@+id/btn_self_motor"
+        app:layout_constraintLeft_toRightOf="@+id/btn_self_motor"
+        android:background="@drawable/shape_bg_e2e2e2"
+        android:layout_marginTop="50dp"
+        android:layout_marginLeft="50dp"
+        app:leftText="原点最小距离 -"
+        app:centerText="100 cm"
+        app:rightText="原点最小距离 +" />
+
+    <com.sunway.l850tdemo.custom_view.AdjustView
+        android:id="@+id/av_origin_max"
+        android:layout_width="860dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@+id/av_origin_min"
+        app:layout_constraintLeft_toRightOf="@+id/btn_self_motor"
+        android:background="@drawable/shape_bg_e2e2e2"
+        android:layout_marginTop="20dp"
+        android:layout_marginLeft="50dp"
+        app:leftText="原点最大距离 -"
+        app:centerText="100 cm"
+        app:rightText="原点最大距离 +" />
+
+    <com.sunway.l850tdemo.custom_view.AdjustView
+        android:id="@+id/av_velocity_range"
+        android:layout_width="860dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@+id/av_origin_max"
+        app:layout_constraintLeft_toRightOf="@+id/btn_self_motor"
+        android:background="@drawable/shape_bg_e2e2e2"
+        android:layout_marginTop="20dp"
+        android:layout_marginLeft="50dp"
+        app:leftText="等速系数范围 -"
+        app:centerText="10"
+        app:rightText="等速系数范围 +" />
+
+    <com.sunway.l850tdemo.custom_view.AdjustView
+        android:id="@+id/av_torque_cycle"
+        android:layout_width="860dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@+id/av_velocity_range"
+        app:layout_constraintLeft_toRightOf="@+id/btn_self_motor"
+        android:background="@drawable/shape_bg_e2e2e2"
+        android:layout_marginTop="20dp"
+        android:layout_marginLeft="50dp"
+        app:leftText="力矩周期系数 -"
+        app:centerText="10"
+        app:rightText="力矩周期系数 +" />
+
+    <com.sunway.l850tdemo.custom_view.AdjustView
+        android:id="@+id/av_torque"
+        android:layout_width="860dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@+id/av_torque_cycle"
+        app:layout_constraintLeft_toRightOf="@+id/btn_self_motor"
+        android:background="@drawable/shape_bg_e2e2e2"
+        android:layout_marginTop="20dp"
+        android:layout_marginLeft="50dp"
+        app:leftText="力矩系数 -"
+        app:centerText="10"
+        app:rightText="力矩系数 +" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

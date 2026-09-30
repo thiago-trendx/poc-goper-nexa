@@ -1,0 +1,36 @@
+<resources>
+    <string name="app_name">L850TDemo</string>
+
+    <!-- 系统更新 -->
+    <string name="update_app">应用程序</string>
+    <string name="update_upper_controller">上控程序</string>
+    <string name="update_lower_controller">下控程序</string>
+    <string name="update_version">版本</string>
+    <string name="update_software_number">软件编号</string>
+    <string name="update_product_model">产品型号</string>
+    <string name="update_current_version">当前版本</string>
+    <string name="update_latest_version">最新版本</string>
+    <string name="update_check_update">检查更新</string>
+    <string name="update_download_updates">下载更新</string>
+    <string name="update_downloading">正在下载更新内容...</string>
+    <string name="update_download_error">下载失败</string>
+    <string name="update_install_error">安装失败</string>
+    <string name="update_redownload">重新下载</string>
+    <string name="update_reinstall">重新安装</string>
+    <string name="update_install_update">安装更新</string>
+    <string name="update_installing">安装中，安装完成后应用将自动重启。</string>
+    <string name="update_installing_firmware">安装中...</string>
+    <string name="update_wait_clear">等待数据清除</string>
+    <string name="update_install_compeleted">安装完成</string>
+    <string name="update_is_last_version">当前已是最新版本</string>
+    <string name="update_restart_tip">安装完成，需要关机重启后方可生效。</string>
+    <string name="update_revert">恢复</string>
+    <string name="update_revert_version_code">版本号：%s</string>
+    <string name="update_revert_time">更新时间：%s</string>
+    <string name="update_is_factory_version">当前已是出厂版本</string>
+    <string name="update_not_selected_verison">您还没有选择版本</string>
+
+    <string name="error_notice">提示</string>
+    <string name="dialog_confirm">确定</string>
+    <string name="dialog_cancel">取消</string>
+</resources>

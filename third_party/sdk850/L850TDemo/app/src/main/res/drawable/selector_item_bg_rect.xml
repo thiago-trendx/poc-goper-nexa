@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="false">
+        <shape
+            android:shape="rectangle">
+
+            <!-- 1. 内部填充：半透明背景（核心） -->
+            <!-- #80FFFFFF 解读：前两位80是透明度（00全透/FF不透），后六位FFFFFF是白色 -->
+            <solid android:color="@color/white" />
+
+            <!-- 3. 圆角：统一圆角（也可单独设置四个角） -->
+            <corners
+                android:radius="0dp"
+                />
+
+        </shape>
+    </item>
+
+    <item android:state_selected="true">
+        <shape
+            android:shape="rectangle">
+
+            <!-- 1. 内部填充：半透明背景（核心） -->
+            <!-- #80FFFFFF 解读：前两位80是透明度（00全透/FF不透），后六位FFFFFF是白色 -->
+            <solid android:color="@color/white" />
+
+            <stroke android:width="3dp" android:color="@color/color_333_or_008b8b"/>
+
+            <!-- 3. 圆角：统一圆角（也可单独设置四个角） -->
+            <corners
+                android:radius="0dp"
+                />
+
+        </shape>
+    </item>
+
+</selector>

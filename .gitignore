@@ -1,0 +1,16 @@
+# Gradle / build
+.gradle/
+build/
+local.properties
+.dart_tool/
+
+# IDE
+.idea/
+*.iml
+
+# Segredos e assinatura — nunca versionar
+*.jks
+*.keystore
+key.properties
+*.pk8
+*.pem

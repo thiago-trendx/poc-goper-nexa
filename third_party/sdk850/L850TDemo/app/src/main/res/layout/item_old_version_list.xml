@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="80dp"
+    tools:layout_width="500dp"
+    tools:layout_height="90dp"
+    tools:layout_marginTop="30dp"
+    android:background="@drawable/selector_item_bg_rect"
+    android:gravity="center_vertical"
+    android:paddingHorizontal="20dp">
+
+    <TextView
+        android:id="@+id/tv_code"
+        android:layout_width="wrap_content"
+        android:text="@string/update_revert_version_code"
+        android:textSize="28sp"
+        android:textColor="@color/color_333_or_008b8b"
+        android:layout_height="wrap_content"/>
+
+    <TextView
+        android:id="@+id/tv_time"
+        android:layout_width="wrap_content"
+        android:text="@string/update_revert_time"
+        android:textSize="23sp"
+        android:textColor="@color/color_333_or_008b8b"
+        android:layout_alignParentRight="true"
+        android:layout_height="wrap_content"/>
+
+
+</RelativeLayout>

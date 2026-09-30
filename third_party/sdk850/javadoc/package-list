@@ -1,0 +1,13 @@
+$dokka.format:javadoc-v1
+$dokka.linkExtension:html
+$dokka.location:com.sunway.sdk850.base.paser/BaseDataFramePaser.OnFrameListener///PointingToDeclaration/com/sunway/sdk850/base/paser/BaseDataFramePaser.OnFrameListener.html
+$dokka.location:com.sunway.sdk850.base/SerialPortCallback.Simple///PointingToDeclaration/com/sunway/sdk850/base/SerialPortCallback.Simple.html
+$dokka.location:com.sunway.sdk850.base/SerialPortManager.State///PointingToDeclaration/com/sunway/sdk850/base/SerialPortManager.State.html
+$dokka.location:com.sunway.sdk850.base/SerialPortReader.OnDataListener///PointingToDeclaration/com/sunway/sdk850/base/SerialPortReader.OnDataListener.html
+$dokka.location:com.sunway.sdk850.base/SerialPortSender.OnSendListener///PointingToDeclaration/com/sunway/sdk850/base/SerialPortSender.OnSendListener.html
+$dokka.location:com.sunway.sdk850.port/FirmwareInstaller.CallBack///PointingToDeclaration/com/sunway/sdk850/port/FirmwareInstaller.CallBack.html
+com.sunway.sdk850
+com.sunway.sdk850.base
+com.sunway.sdk850.base.paser
+com.sunway.sdk850.port
+com.sunway.sdk850.port.bean
