@@ -104,3 +104,11 @@ Registrar o que for observado como "observado, não confirmado pelo fabricante".
 4. **Ajuste de posição dos motores**: ler as posições atuais em Controle; ajustar **só 1 passo** em um motor, com o ajuste confirmado. Medir o tempo até `liftMotorStatus` voltar a `0x00` e se o status passa por `0x01`. Anotar o tempo (resposta à pergunta de `MOTOR_LONG_TIME`). Depois voltar à posição original.
 5. **Autoteste** (130 s, move os motores): só com tudo livre. Medir quando termina, se o status passa por `0x02` e se o flag `false` é enviado na hora (log).
 6. **Abortos**: durante o ajuste/autoteste, desligar o polling e conferir que o flag volta a `false` e a tela mostra `timeout`.
+
+## Fase 6 — roteiro de bancada (NÃO executado ainda)
+Só leitura de dados; com a máquina parada o teste de taxa é seguro. Salvar os arquivos e puxar com `adb pull` (pasta `Android/data/com.goper.poc_goper_nexa/files`).
+
+1. **Teste de taxa:** Telemetria → "Iniciar teste de taxa" (45 s, máquina parada). Esperado, pelas medições da Fase 2: 200 ms ≈ 4 Hz (~98%), 100 ms ≈ 8 Hz (~82%), 50 ms quase sem resposta. Conferir se os números do app batem com os do log e salvar o relatório.
+2. **Gráficos com movimento:** modo Padrão, 5 kg, puxar o cabo devagar por ~20 s, com a parada física ao alcance. Conferir que força real × tempo, velocidade × tempo e força × curso acompanham o movimento (lembrando que `real` foi 0 com 5 kg na Fase 4 e que `velocidade` só mostrou 0,0 e 43,0 em STOP).
+3. **CSV:** gravar ~30 s com movimento, parar e abrir o arquivo; conferir o cabeçalho, o número de linhas (~4 por segundo a 200 ms) e que `tsMonotonicMs` cresce de forma regular.
+4. **Erros observados:** se algum `errorCode` aparecer, anotar o código, o que estava acontecendo e se o reset de erro o limpou.
