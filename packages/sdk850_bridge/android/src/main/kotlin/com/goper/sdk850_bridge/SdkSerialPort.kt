@@ -5,6 +5,7 @@ import com.sunway.sdk850.base.SerialPortManager
 import com.sunway.sdk850.base.paser.SerialPacket
 import com.sunway.sdk850.port.Cmd
 import com.sunway.sdk850.port.DeviceManager
+import com.sunway.sdk850.port.bean.ClearMode
 import com.sunway.sdk850.port.bean.DeviceInfo
 import com.sunway.sdk850.port.bean.DeviceParams
 import com.sunway.sdk850.port.bean.ControlParams
@@ -156,6 +157,21 @@ class SdkSerialPort : SdkPort {
     override fun setSafeMode(value: Int) = control.setSafeMode(value)
 
     override fun setBalancingForce(kg: Int) = control.setBalancingForce(kg)
+
+    override fun setNeedSetOrigin(value: Boolean) = control.setNeedSetOrigin(value)
+
+    override fun setNeedErrorRestore(value: Boolean) = control.setNeedErrorRestor(value)
+
+    override fun setClearMode(mode: String) = control.setClearMode(ClearMode.valueOf(mode))
+
+    override fun setRunErrorRestore() = control.setRun(RunState.ERROR_RESTORE)
+
+    override fun setMotorSelfCheck(value: Boolean) = control.setMotorSelfCheck(value)
+
+    override fun setMotorPositions(p1: Int, p2: Int) {
+        control.setMotorPosition1(p1)
+        control.setMotorPosition2(p2)
+    }
 
     override fun deviceParams(): ParamsValues = DeviceManager.getInstance().getDeviceParams().toValues()
 

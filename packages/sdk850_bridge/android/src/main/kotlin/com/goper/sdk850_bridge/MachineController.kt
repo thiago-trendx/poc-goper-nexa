@@ -13,7 +13,8 @@ import com.sunway.sdk850.port.bean.DeviceStatus
 class MachineController(
     private val port: SdkPort,
     scheduler: Scheduler,
-    private val clock: Clock = SystemClockSource
+    private val clock: Clock = SystemClockSource,
+    private val liftAdjustTimeoutSec: Int = LIFT_ADJUST_TIMEOUT_SEC
 ) : PortListener {
 
     /** Destino dos eventos (o `EventSink` do canal). Nulo enquanto ninguém escuta. */
@@ -30,6 +31,13 @@ class MachineController(
 
     val isPolling: Boolean
         get() = loop.isRunning
+
+    private val lift = LiftMotorGuard(scheduler, ::onLiftPhase)
+
+    /** Operação que a [lift] está acompanhando; só tem valor enquanto ela está ativa. */
+    private var liftKind: LiftKind? = null
+
+    private enum class LiftKind { ADJUST, SELF_CHECK }
 
     // ---- Inicialização e conexão ----
 
@@ -87,8 +95,9 @@ class MachineController(
 
     fun disconnect() {
         if (!configured) return
-        haltPolling()
+        loop.stop()
         port.clearSendQueue()
+        haltPolling()
         port.disconnect()
     }
 
@@ -129,12 +138,15 @@ class MachineController(
     fun startPolling(intervalMs: Int) {
         requireConnected()
         port.markStop()
+        disarmOneShot()
+        port.setMotorSelfCheck(false)
         loop.start(intervalMs.toLong())
     }
 
     fun stopPolling() {
-        haltPolling()
+        loop.stop()
         if (configured) port.clearSendQueue()
+        haltPolling()
     }
 
     fun queryDeviceInfo() {
@@ -157,11 +169,12 @@ class MachineController(
      * `release()` do SDK fica para o desligamento do processo e nunca é chamado aqui.
      */
     fun shutdown() {
-        haltPolling()
+        emitter = null // o canal já foi cancelado: a limpeza abaixo não publica eventos
+        loop.stop()
         runCatching { port.clearSendQueue() }
+        runCatching { haltPolling() }
         runCatching { port.unregister() }
         runCatching { port.disconnect() }
-        emitter = null
         configured = false
     }
 
@@ -184,6 +197,7 @@ class MachineController(
      */
     fun start() {
         requireConnected()
+        requireLiftIdle("iniciar")
         if (!loop.isRunning) {
             throw BridgeException(
                 BridgeException.SDK_ERROR,
@@ -273,6 +287,162 @@ class MachineController(
         return null
     }
 
+    // ---- Disparo único e motores de elevação (Fase 5) ----
+
+    /**
+     * Redefine a origem (`needSetOrigin` + `ClearMode.ALL`, como o demo). Disparo único: o comando
+     * é enviado uma vez e os flags são desligados em seguida, para o polling não repeti-lo.
+     * Só com a máquina parada.
+     */
+    fun originReset() {
+        requireConnected()
+        requireLiftIdle("redefinir a origem")
+        requireStopped("redefinir a origem")
+        sendOneShot {
+            port.setNeedSetOrigin(true)
+            port.setClearMode("ALL")
+        }
+    }
+
+    /**
+     * Restaura erros (`needErrorRestor` + `run = ERROR_RESTORE`, como o demo). Disparo único; ao
+     * terminar o estado local volta a `STOP`. Só com a máquina parada.
+     */
+    fun errorRestore() {
+        requireConnected()
+        requireLiftIdle("restaurar erros")
+        requireStopped("restaurar erros")
+        try {
+            sendOneShot {
+                port.setNeedErrorRestore(true)
+                port.setRunErrorRestore()
+            }
+        } finally {
+            port.markStop()
+        }
+    }
+
+    /**
+     * Zera as contagens de [mode] (`FIRST`, `SECOND`, `ALL` ou `NONE`; já validado por
+     * [Args.clearMode]). O guia avisa que esse comando não pode ser enviado continuamente: vai
+     * uma vez só. `NONE` não faz nada.
+     */
+    fun clearData(mode: String) {
+        requireConnected()
+        requireLiftIdle("limpar dados")
+        if (mode == "NONE") return
+        sendOneShot { port.setClearMode(mode) }
+    }
+
+    /**
+     * Ajusta a posição dos motores de elevação. Para o movimento antes (STOP enviado na hora) e
+     * grava as posições, que o polling reenvia a cada ciclo. O fim é detectado pelo status do
+     * motor ou pelo timeout ([LIFT_ADJUST_TIMEOUT_SEC]); em ambos o estado fica em `STOP`: o
+     * demo reinicia o movimento sozinho, aqui o usuário precisa iniciar de novo.
+     */
+    fun setMotorPosition(p1: Int, p2: Int) {
+        requireConnected()
+        requireLiftIdle("ajustar a posição dos motores")
+        requirePolling("ajustar a posição dos motores")
+        if (p1 < 0 || p2 < 0) {
+            throw BridgeException(BridgeException.OUT_OF_RANGE, "As posições dos motores devem ser >= 0")
+        }
+        val current = port.controlValues()
+        if (p1 == current.motorPosition1 && p2 == current.motorPosition2) {
+            throw BridgeException(
+                BridgeException.INVALID_ARGS,
+                "Os motores já estão nas posições $p1 e $p2; nada a ajustar"
+            )
+        }
+        haltMotion()
+        port.setMotorPositions(p1, p2)
+        liftKind = LiftKind.ADJUST
+        lift.begin(liftAdjustTimeoutSec)
+    }
+
+    /**
+     * Autoteste dos motores de elevação (`motorSelfCheck = true` durante a operação). O Javadoc
+     * exige o movimento parado e que o app volte o flag para `false` assim que o controlador
+     * terminar: a guarda faz isso ao concluir, ao estourar [timeoutSec] ou ao abortar.
+     */
+    fun startMotorSelfCheck(timeoutSec: Int) {
+        requireConnected()
+        requireLiftIdle("iniciar o autoteste")
+        requirePolling("iniciar o autoteste")
+        if (timeoutSec !in 1..MAX_SELF_CHECK_TIMEOUT_SEC) {
+            throw BridgeException(
+                BridgeException.OUT_OF_RANGE,
+                "timeoutSec deve estar entre 1 e $MAX_SELF_CHECK_TIMEOUT_SEC"
+            )
+        }
+        haltMotion()
+        port.setMotorSelfCheck(true)
+        liftKind = LiftKind.SELF_CHECK
+        lift.begin(timeoutSec)
+    }
+
+    /** Envia os `ControlParams` armados uma única vez e desliga os flags em seguida. */
+    private fun sendOneShot(arm: () -> Unit) {
+        try {
+            arm()
+            port.send(port.controlCommand())
+        } finally {
+            disarmOneShot()
+        }
+    }
+
+    /** Desliga os flags de disparo único para o polling não repetir o comando. */
+    private fun disarmOneShot() {
+        port.setNeedSetOrigin(false)
+        port.setNeedErrorRestore(false)
+        port.setClearMode("NONE")
+    }
+
+    /** `run = STOP` e o comando de controle sai na hora, sem esperar o próximo ciclo. */
+    private fun haltMotion() {
+        port.markStop()
+        port.send(port.controlCommand())
+    }
+
+    private fun requireStopped(action: String) {
+        if (port.controlValues().run == "RUNNING") {
+            throw BridgeException(BridgeException.BUSY, "Pare a máquina antes de $action")
+        }
+    }
+
+    private fun requirePolling(action: String) {
+        if (!loop.isRunning) {
+            throw BridgeException(
+                BridgeException.SDK_ERROR,
+                "Ligue o polling antes de $action: o controlador só recebe as ordens pelo polling"
+            )
+        }
+    }
+
+    private fun requireLiftIdle(action: String) {
+        if (lift.isActive) {
+            throw BridgeException(
+                BridgeException.BUSY,
+                "Os motores de elevação estão em operação; aguarde o fim antes de $action"
+            )
+        }
+    }
+
+    /**
+     * Início ou fim de uma operação dos motores. Ao terminar, por qualquer motivo, desliga o flag
+     * de autoteste, volta a `STOP` e empurra a ordem na hora (o Javadoc pede resposta imediata)
+     * antes de publicar o evento.
+     */
+    private fun onLiftPhase(phase: LiftPhase, remainingSec: Int) {
+        if (phase != LiftPhase.STARTED) {
+            if (liftKind == LiftKind.SELF_CHECK) runCatching { port.setMotorSelfCheck(false) }
+            runCatching { port.markStop() }
+            if (port.isConnected()) runCatching { port.send(port.controlCommand()) }
+            liftKind = null
+        }
+        emit(Mappers.liftMotor(phase.wire, remainingSec))
+    }
+
     // ---- Internos ----
 
     /**
@@ -281,7 +451,11 @@ class MachineController(
      */
     private fun haltPolling() {
         loop.stop()
-        if (configured) runCatching { port.markStop() }
+        if (configured) {
+            runCatching { port.markStop() }
+            // Sem polling a máquina não recebe mais ordens: a guarda dos motores não pode esperar.
+            lift.abort()
+        }
     }
 
     private fun requireInitialized() {
@@ -337,8 +511,10 @@ class MachineController(
         emit(Mappers.log("tx", if (success) name else "$name (falha no envio)", Mappers.hex(data), clock.epochMs()))
     }
 
-    override fun onStatus(status: DeviceStatus) =
+    override fun onStatus(status: DeviceStatus) {
         emit(Mappers.status(status, clock.monotonicMs(), clock.epochMs()))
+        lift.onLiftStatus(status.getLiftMotorStatus().toInt())
+    }
 
     override fun onDeviceInfo(info: DeviceInfo) = emit(Mappers.deviceInfo(info))
 
@@ -351,6 +527,16 @@ class MachineController(
     companion object {
         /** Acima disso o ciclo de polling é pulado até o envio andar. */
         const val MAX_PENDING_COMMANDS = 3
+
+        /**
+         * Timeout do ajuste de posição dos motores. O demo usa `4 + Δnível × MOTOR_LONG_TIME` s, mas
+         * o valor de `MOTOR_LONG_TIME` não está documentado: este é um teto conservador provisório
+         * (igual ao do autoteste), a ser medido na bancada e confirmado com o fabricante.
+         */
+        const val LIFT_ADJUST_TIMEOUT_SEC = 130
+
+        /** Teto do timeout de autoteste aceito do app. */
+        const val MAX_SELF_CHECK_TIMEOUT_SEC = 600
 
         val shared: MachineController by lazy {
             MachineController(SdkSerialPort(), HandlerScheduler())

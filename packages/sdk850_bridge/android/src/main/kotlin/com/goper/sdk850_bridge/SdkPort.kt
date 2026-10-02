@@ -73,6 +73,23 @@ interface SdkPort {
     fun setSafeMode(value: Int)
     fun setBalancingForce(kg: Int)
 
+    // ---- Disparo único e motores de elevação (Fase 5) ----
+    // Primitivas sobre os `ControlParams`; a ordem e o reset dos flags ficam no MachineController.
+
+    fun setNeedSetOrigin(value: Boolean)
+    fun setNeedErrorRestore(value: Boolean)
+
+    /** [mode] é o `name()` de `ClearMode`: `FIRST`, `SECOND`, `ALL` ou `NONE`. */
+    fun setClearMode(mode: String)
+
+    /** `run = ERROR_RESTORE` (o demo usa esse estado ao restaurar erros). */
+    fun setRunErrorRestore()
+
+    fun setMotorSelfCheck(value: Boolean)
+
+    /** Também persiste as posições em SharedPreferences (Javadoc). */
+    fun setMotorPositions(p1: Int, p2: Int)
+
     /**
      * `DeviceParams` guardados no `DeviceManager`. É o cache local (SharedPreferences), que o SDK
      * também atualiza com o retorno de `SEND_PARAMS`; **não** é uma leitura do controlador.

@@ -58,6 +58,10 @@ object Mappers {
 
     fun controlParams(values: ControlValues): Map<String, Any?> = values.toMap()
 
+    /** Evento `liftMotor`; [phase] é `started`, `completed` ou `timeout`. */
+    fun liftMotor(phase: String, remainingSec: Int): Map<String, Any?> =
+        mapOf("type" to "liftMotor", "phase" to phase, "remainingSec" to remainingSec)
+
     fun connectionInfo(state: String, portPath: String?): Map<String, Any?> =
         mapOf("state" to state, "portPath" to portPath)
 

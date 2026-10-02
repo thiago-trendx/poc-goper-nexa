@@ -9,6 +9,9 @@ object ControlLimits {
     val MODES: Set<String> = setOf("STANDARD", "CENTRIPETAL", "CENTRIFUGAL", "VELOCITY", "ELASTIC")
     val COEFFICIENT_KINDS: Set<String> = setOf("centripetal", "centrifugal", "velocity", "elastic")
 
+    /** Modos de `clearData` (`ClearMode`). */
+    val CLEAR_MODES: Set<String> = setOf("NONE", "FIRST", "SECOND", "ALL")
+
     /** 0 = normal, 51 = falha/fadiga, 53 = proteção. */
     val SAFE_MODES: Set<Int> = setOf(0, 51, 53)
 

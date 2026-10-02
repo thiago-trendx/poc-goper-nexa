@@ -239,6 +239,7 @@ class FakeMachineGateway implements MachineGateway {
     _pollTimer = null;
     // Sem polling a máquina não recebe mais ordens: o estado local volta a STOP.
     _control = _control.copyWith(run: RunState.stop);
+    _abortLift();
   }
 
   @override
@@ -277,6 +278,7 @@ class FakeMachineGateway implements MachineGateway {
   @override
   Future<void> start() async {
     _precheck();
+    _requireLiftIdle();
     if (_pollTimer == null) {
       throw const MachineException(
         MachineErrorCode.sdkError,
@@ -302,6 +304,8 @@ class FakeMachineGateway implements MachineGateway {
   @override
   Future<void> originReset() async {
     _precheck();
+    _requireLiftIdle();
+    _requireStopped('redefinir a origem');
     _distance = 0;
     _pullOffset = _runMs ~/ repetitionPeriod.inMilliseconds;
   }
@@ -309,12 +313,15 @@ class FakeMachineGateway implements MachineGateway {
   @override
   Future<void> errorRestore() async {
     _precheck();
+    _requireLiftIdle();
+    _requireStopped('restaurar erros');
     clearInjectedErrors();
   }
 
   @override
   Future<void> clearData(ClearMode mode) async {
     _precheck();
+    _requireLiftIdle();
     if (mode == ClearMode.none) return;
     _pullOffset = _runMs ~/ repetitionPeriod.inMilliseconds;
   }
@@ -388,10 +395,17 @@ class FakeMachineGateway implements MachineGateway {
   @override
   Future<void> setMotorPosition({required int p1, required int p2}) async {
     _precheck();
-    if (p1 < 0 || p2 < 0) {
-      throw const MachineException(MachineErrorCode.outOfRange, 'Posição deve ser >= 0');
-    }
     _requireLiftIdle();
+    _requirePolling('ajustar a posição dos motores');
+    if (p1 < 0 || p2 < 0) {
+      throw const MachineException(MachineErrorCode.outOfRange, 'As posições dos motores devem ser >= 0');
+    }
+    if (p1 == _control.motorPosition1 && p2 == _control.motorPosition2) {
+      throw MachineException(
+        MachineErrorCode.invalidArgs,
+        'Os motores já estão nas posições $p1 e $p2; nada a ajustar',
+      );
+    }
     _control = _control.copyWith(run: RunState.stop, motorPosition1: p1, motorPosition2: p2);
     _startLift(
       _LiftActivity.adjusting,
@@ -403,10 +417,11 @@ class FakeMachineGateway implements MachineGateway {
   @override
   Future<void> startMotorSelfCheck({int timeoutSec = 130}) async {
     _precheck();
-    if (timeoutSec <= 0) {
-      throw const MachineException(MachineErrorCode.invalidArgs, 'timeoutSec deve ser > 0');
-    }
     _requireLiftIdle();
+    _requirePolling('iniciar o autoteste');
+    if (timeoutSec < 1 || timeoutSec > 600) {
+      throw const MachineException(MachineErrorCode.outOfRange, 'timeoutSec deve estar entre 1 e 600');
+    }
     // O Javadoc exige o movimento parado durante o autoteste.
     _control = _control.copyWith(run: RunState.stop, motorSelfCheck: true);
     _startLift(_LiftActivity.selfChecking, duration: selfCheckDuration, remainingSec: timeoutSec);
@@ -493,6 +508,32 @@ class FakeMachineGateway implements MachineGateway {
     return null;
   }
 
+  void _requireStopped(String action) {
+    if (_control.run == RunState.running) {
+      throw MachineException(MachineErrorCode.busy, 'Pare a máquina antes de $action');
+    }
+  }
+
+  void _requirePolling(String action) {
+    if (_pollTimer == null) {
+      throw MachineException(
+        MachineErrorCode.sdkError,
+        'Ligue o polling antes de $action: o controlador só recebe as ordens pelo polling',
+      );
+    }
+  }
+
+  /// Como o nativo: sem polling ou sem conexão a operação dos motores é abortada e conta como
+  /// `timeout`, para a tela não ficar esperando um evento que não virá.
+  void _abortLift() {
+    if (_lift == _LiftActivity.none) return;
+    _liftTimer?.cancel();
+    final wasSelfCheck = _lift == _LiftActivity.selfChecking;
+    _lift = _LiftActivity.none;
+    _control = _control.copyWith(run: RunState.stop, motorSelfCheck: wasSelfCheck ? false : null);
+    _emit(const LiftMotorEvent(phase: LiftMotorPhase.timeout, remainingSec: 0));
+  }
+
   void _requireLiftIdle() {
     if (_lift != _LiftActivity.none) {
       throw const MachineException(MachineErrorCode.busy, 'Motores de elevação em operação');
@@ -524,8 +565,7 @@ class FakeMachineGateway implements MachineGateway {
     _connectTimer?.cancel();
     _pollTimer?.cancel();
     _pollTimer = null;
-    _liftTimer?.cancel();
-    _lift = _LiftActivity.none;
+    _abortLift();
     if (_firmwareTimer != null) {
       _firmwareTimer!.cancel();
       _firmwareTimer = null;

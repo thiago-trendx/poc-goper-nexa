@@ -30,9 +30,40 @@ internal class Sdk850BridgePluginTest {
 
     @Test
     fun metodoDesconhecido_respondeNotImplemented() {
-        Mockito.verify(call("originReset")).notImplemented()
-        Mockito.verify(call("clearData", mapOf("mode" to "ALL"))).notImplemented()
         Mockito.verify(call("installFirmware", mapOf("type" to 1))).notImplemented()
+    }
+
+    @Test
+    fun disparoUnico_originResetEClearDataRespondemSucessoEEnviamUmaVez() {
+        connect()
+
+        Mockito.verify(call("originReset")).success(null)
+        Mockito.verify(call("clearData", mapOf("mode" to "FIRST"))).success(null)
+        assertEquals(2, port.controlSends)
+    }
+
+    @Test
+    fun clearData_comModoInvalidoViraINVALID_ARGSENaoEnvia() {
+        connect()
+
+        Mockito.verify(call("clearData", mapOf("mode" to "TUDO"))).error(eq(BridgeException.INVALID_ARGS), any(), any())
+        Mockito.verify(call("clearData", emptyMap())).error(eq(BridgeException.INVALID_ARGS), any(), any())
+        assertEquals(0, port.controlSends)
+    }
+
+    @Test
+    fun setMotorPosition_semUmaPosicaoViraINVALID_ARGS() {
+        connect()
+
+        Mockito.verify(call("setMotorPosition", mapOf("p1" to 3)))
+            .error(eq(BridgeException.INVALID_ARGS), any(), any())
+    }
+
+    @Test
+    fun startMotorSelfCheck_semConexaoViraNOT_CONNECTED() {
+        initializeController()
+
+        Mockito.verify(call("startMotorSelfCheck")).error(eq(BridgeException.NOT_CONNECTED), any(), any())
     }
 
     @Test

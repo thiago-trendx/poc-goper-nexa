@@ -147,7 +147,8 @@ internal class MachineControllerTest {
         controller.disconnect()
         scheduler.advance(1000)
 
-        assertEquals(listOf("markStop", "clearSendQueue", "disconnect"), port.calls)
+        // a fila é limpa antes de abortar a guarda dos motores, para a ordem de limpeza poder sair
+        assertEquals(listOf("clearSendQueue", "markStop", "disconnect"), port.calls)
         assertFalse(controller.isPolling)
     }
 
@@ -182,7 +183,18 @@ internal class MachineControllerTest {
         controller.startPolling(200)
         scheduler.advance(0)
 
-        assertEquals(listOf("markStop", "send:0C"), port.calls)
+        assertEquals(
+            listOf(
+                "markStop",
+                "setNeedSetOrigin:false",
+                "setNeedErrorRestore:false",
+                "setClearMode:NONE",
+                "setMotorSelfCheck:false",
+                "send:0C"
+            ),
+            port.calls,
+            "o polling começa em STOP e sem flags de disparo único nem de autoteste"
+        )
     }
 
     @Test
@@ -224,7 +236,7 @@ internal class MachineControllerTest {
         scheduler.advance(1000)
 
         assertEquals(sent, port.controlSends)
-        assertEquals(listOf("markStop", "clearSendQueue"), port.calls)
+        assertEquals(listOf("clearSendQueue", "markStop"), port.calls)
         assertFalse(controller.isPolling)
     }
 
@@ -399,7 +411,7 @@ internal class MachineControllerTest {
         controller.shutdown()
         scheduler.advance(1000)
 
-        assertEquals(listOf("markStop", "clearSendQueue", "unregister", "disconnect"), port.calls)
+        assertEquals(listOf("clearSendQueue", "markStop", "unregister", "disconnect"), port.calls)
         assertFalse(controller.isPolling)
         assertFalse(port.calls.contains("release"))
     }

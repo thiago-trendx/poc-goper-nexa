@@ -90,6 +90,15 @@ object Args {
         )
     }
 
+    fun clearMode(args: Map<*, *>?): String {
+        val mode = args?.get("mode")
+        if (mode is String && mode in ControlLimits.CLEAR_MODES) return mode
+        throw BridgeException(
+            BridgeException.INVALID_ARGS,
+            "mode deve ser um de ${ControlLimits.CLEAR_MODES.joinToString(", ")}"
+        )
+    }
+
     fun safeMode(args: Map<*, *>?): Int {
         val value = requiredInt(args, "value")
         if (value in ControlLimits.SAFE_MODES) return value

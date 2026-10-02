@@ -137,6 +137,31 @@ class Sdk850BridgePlugin(
                     result.success(null)
                 }
 
+                "originReset" -> {
+                    controller.originReset()
+                    result.success(null)
+                }
+
+                "errorRestore" -> {
+                    controller.errorRestore()
+                    result.success(null)
+                }
+
+                "clearData" -> {
+                    controller.clearData(Args.clearMode(args))
+                    result.success(null)
+                }
+
+                "setMotorPosition" -> {
+                    controller.setMotorPosition(Args.requiredInt(args, "p1"), Args.requiredInt(args, "p2"))
+                    result.success(null)
+                }
+
+                "startMotorSelfCheck" -> {
+                    controller.startMotorSelfCheck(Args.optionalInt(args, "timeoutSec") ?: DEFAULT_SELF_CHECK_TIMEOUT_SEC)
+                    result.success(null)
+                }
+
                 else -> result.notImplemented()
             }
         } catch (e: BridgeException) {
@@ -175,5 +200,8 @@ class Sdk850BridgePlugin(
     companion object {
         const val METHODS_CHANNEL = "sdk850_bridge/methods"
         const val EVENTS_CHANNEL = "sdk850_bridge/events"
+
+        /** Autoteste dos motores no demo do fabricante: 130 s. */
+        const val DEFAULT_SELF_CHECK_TIMEOUT_SEC = 130
     }
 }

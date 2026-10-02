@@ -115,7 +115,13 @@ class FakePort : SdkPort {
     }
 
     override fun pendingCount(): Int = pending
-    override fun controlCommand(): ByteArray = controlBytes
+    /** Retrato dos `ControlParams` no instante de cada `controlCommand()` (o que iria no pacote). */
+    val controlSnapshots = mutableListOf<ControlValues>()
+
+    override fun controlCommand(): ByteArray {
+        controlSnapshots += control
+        return controlBytes
+    }
 
     var control = defaultControl()
 
@@ -164,6 +170,36 @@ class FakePort : SdkPort {
     override fun setBalancingForce(kg: Int) {
         calls += "setBalancingForce:$kg"
         control = control.copy(balancingForce = kg)
+    }
+
+    override fun setNeedSetOrigin(value: Boolean) {
+        calls += "setNeedSetOrigin:$value"
+        control = control.copy(needSetOrigin = value)
+    }
+
+    override fun setNeedErrorRestore(value: Boolean) {
+        calls += "setNeedErrorRestore:$value"
+        control = control.copy(needErrorRestor = value)
+    }
+
+    override fun setClearMode(mode: String) {
+        calls += "setClearMode:$mode"
+        control = control.copy(clearMode = mode)
+    }
+
+    override fun setRunErrorRestore() {
+        calls += "setRunErrorRestore"
+        control = control.copy(run = "ERROR_RESTORE")
+    }
+
+    override fun setMotorSelfCheck(value: Boolean) {
+        calls += "setMotorSelfCheck:$value"
+        control = control.copy(motorSelfCheck = value)
+    }
+
+    override fun setMotorPositions(p1: Int, p2: Int) {
+        calls += "setMotorPositions:$p1:$p2"
+        control = control.copy(motorPosition1 = p1, motorPosition2 = p2)
     }
 
     val paramsBytes = byteArrayOf(0x0A)

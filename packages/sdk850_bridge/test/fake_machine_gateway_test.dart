@@ -510,11 +510,85 @@ void main() {
     test('segundo ajuste durante o primeiro falha com BUSY', () {
       fakeAsync((async) {
         final g = _connected(async).gateway;
+        g.startPolling(intervalMs: 100);
+        g.setForce(10);
         g.setMotorPosition(p1: 1, p2: 1);
         async.flushMicrotasks();
 
         expect(_failure(async, g.setMotorPosition(p1: 2, p2: 2))?.code, MachineErrorCode.busy);
         expect(_failure(async, g.startMotorSelfCheck())?.code, MachineErrorCode.busy);
+        expect(_failure(async, g.start())?.code, MachineErrorCode.busy);
+        expect(_failure(async, g.originReset())?.code, MachineErrorCode.busy);
+        expect(_failure(async, g.errorRestore())?.code, MachineErrorCode.busy);
+        expect(_failure(async, g.clearData(ClearMode.all))?.code, MachineErrorCode.busy);
+      });
+    });
+
+    test('ajuste e autoteste exigem o polling ligado', () {
+      fakeAsync((async) {
+        final g = _connected(async).gateway;
+
+        expect(_failure(async, g.setMotorPosition(p1: 1, p2: 1))?.code, MachineErrorCode.sdkError);
+        expect(_failure(async, g.startMotorSelfCheck())?.code, MachineErrorCode.sdkError);
+        expect(g.controlSnapshot.motorSelfCheck, isFalse);
+      });
+    });
+
+    test('ajustar para as posições atuais é recusado', () {
+      fakeAsync((async) {
+        final g = _connected(async).gateway;
+        g.startPolling(intervalMs: 100);
+
+        expect(_failure(async, g.setMotorPosition(p1: 0, p2: 0))?.code, MachineErrorCode.invalidArgs);
+      });
+    });
+
+    test('parar o polling durante o autoteste aborta como timeout e desliga o flag', () {
+      fakeAsync((async) {
+        final c = _connected(async);
+        final g = c.gateway;
+        g.startPolling(intervalMs: 100);
+        g.startMotorSelfCheck();
+        async.flushMicrotasks();
+        expect(g.controlSnapshot.motorSelfCheck, isTrue);
+
+        g.stopPolling();
+        async.flushMicrotasks();
+
+        expect(c.events.whereType<LiftMotorEvent>().last.phase, LiftMotorPhase.timeout);
+        expect(g.controlSnapshot.motorSelfCheck, isFalse);
+        expect(g.controlSnapshot.run, RunState.stop);
+        async.elapse(const Duration(minutes: 5));
+        expect(c.events.whereType<LiftMotorEvent>().length, 2, reason: 'started e timeout, nada depois');
+      });
+    });
+
+    test('perder a conexão durante o ajuste publica timeout', () {
+      fakeAsync((async) {
+        final c = _connected(async);
+        final g = c.gateway;
+        g.startPolling(intervalMs: 100);
+        g.setMotorPosition(p1: 2, p2: 2);
+        async.flushMicrotasks();
+
+        g.disconnect();
+        async.flushMicrotasks();
+
+        expect(c.events.whereType<LiftMotorEvent>().last.phase, LiftMotorPhase.timeout);
+      });
+    });
+
+    test('origem e reset de erro só com a máquina parada', () {
+      fakeAsync((async) {
+        final g = _connected(async).gateway;
+        g.startPolling(intervalMs: 100);
+        g.setForce(10);
+        g.start();
+        async.flushMicrotasks();
+
+        expect(_failure(async, g.originReset())?.code, MachineErrorCode.busy);
+        expect(_failure(async, g.errorRestore())?.code, MachineErrorCode.busy);
+        expect(_failure(async, g.clearData(ClearMode.all)), isNull, reason: 'limpar dados vale em execução');
       });
     });
 
@@ -542,6 +616,7 @@ void main() {
       fakeAsync((async) {
         final c = _connected(async);
         c.gateway.simulateLiftMotorTimeout = true;
+        c.gateway.startPolling(intervalMs: 100);
         c.gateway.setMotorPosition(p1: 1, p2: 1);
         async.elapse(c.gateway.liftMotorAdjustDuration);
 
@@ -552,8 +627,10 @@ void main() {
     test('posição negativa e timeout inválido são rejeitados', () {
       fakeAsync((async) {
         final g = _connected(async).gateway;
+        g.startPolling(intervalMs: 100);
         expect(_failure(async, g.setMotorPosition(p1: -1, p2: 0))?.code, MachineErrorCode.outOfRange);
-        expect(_failure(async, g.startMotorSelfCheck(timeoutSec: 0))?.code, MachineErrorCode.invalidArgs);
+        expect(_failure(async, g.startMotorSelfCheck(timeoutSec: 0))?.code, MachineErrorCode.outOfRange);
+        expect(_failure(async, g.startMotorSelfCheck(timeoutSec: 601))?.code, MachineErrorCode.outOfRange);
       });
     });
   });
