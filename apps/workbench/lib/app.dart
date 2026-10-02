@@ -19,7 +19,9 @@ import 'features/lift_motor/lift_motor_page.dart';
 import 'features/log/log_cubit.dart';
 import 'features/log/log_exporter.dart';
 import 'features/log/log_page.dart';
+import 'features/telemetry/rate_test_cubit.dart';
 import 'features/telemetry/telemetry_bloc.dart';
+import 'features/telemetry/telemetry_export.dart';
 import 'features/telemetry/telemetry_page.dart';
 import 'shared/safety/safety_limits.dart';
 import 'shared/widgets/emergency_stop_button.dart';
@@ -32,6 +34,7 @@ class WorkbenchApp extends StatelessWidget {
     this.limits = const SafetyLimits(),
     this.forceDebounce = const Duration(milliseconds: 150),
     this.logExporter = const FileLogExporter(),
+    this.telemetryExporter = const FileTelemetryExporter(),
     this.simulated = false,
     ProfileStore? profileStore,
   }) : profileStore = profileStore ?? _defaultProfileStore;
@@ -42,6 +45,7 @@ class WorkbenchApp extends StatelessWidget {
   final SafetyLimits limits;
   final Duration forceDebounce;
   final LogExporter logExporter;
+  final TelemetryExporter telemetryExporter;
 
   /// `true` quando o gateway é o falso: a barra do app fica âmbar e mostra "SIMULADO", para
   /// ninguém confundir os valores simulados com os da máquina.
@@ -56,6 +60,7 @@ class WorkbenchApp extends StatelessWidget {
       providers: [
         RepositoryProvider<SafetyLimits>.value(value: limits),
         RepositoryProvider<LogExporter>.value(value: logExporter),
+        RepositoryProvider<TelemetryExporter>.value(value: telemetryExporter),
         RepositoryProvider<ProfileStore>.value(value: profileStore),
         RepositoryProvider<MachineRepository>(
           create: (_) => MachineRepository(gateway, maxForceKg: limits.maxForceKg),
@@ -91,8 +96,14 @@ class WorkbenchApp extends StatelessWidget {
           ),
           BlocProvider(
             lazy: false,
-            create: (context) =>
-                TelemetryBloc(context.read<MachineRepository>())..add(const TelemetryStarted()),
+            create: (context) => TelemetryBloc(
+              context.read<MachineRepository>(),
+              exporter: context.read<TelemetryExporter>(),
+            )..add(const TelemetryStarted()),
+          ),
+          BlocProvider(
+            lazy: false,
+            create: (context) => RateTestCubit(context.read<MachineRepository>()),
           ),
           BlocProvider(
             lazy: false,

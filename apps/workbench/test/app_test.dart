@@ -10,6 +10,7 @@ import 'package:poc_goper_nexa/shared/safety/safety_limits.dart';
 import 'package:poc_goper_nexa/shared/widgets/emergency_stop_button.dart';
 import 'package:sdk850_bridge/sdk850_bridge.dart';
 
+import 'helpers/fake_telemetry_exporter.dart';
 import 'helpers/memory_profile_store.dart';
 import 'helpers/spy_gateway.dart';
 
@@ -30,6 +31,7 @@ Future<void> pumpApp(
   SpyGateway gateway, {
   SafetyLimits limits = const SafetyLimits(),
   LogExporter? logExporter,
+  FakeTelemetryExporter? telemetryExporter,
   bool simulated = false,
   MemoryProfileStore? profileStore,
 }) async {
@@ -41,6 +43,7 @@ Future<void> pumpApp(
     limits: limits,
     forceDebounce: const Duration(milliseconds: 10),
     logExporter: logExporter ?? _FakeExporter(),
+    telemetryExporter: telemetryExporter ?? FakeTelemetryExporter(),
     simulated: simulated,
     profileStore: profileStore ?? MemoryProfileStore(),
   ));
@@ -756,6 +759,87 @@ void main() {
   });
 
   group('telemetria, firmware e log', () {
+    testWidgets('os três gráficos aparecem com dados e a tabela de erros começa vazia', (tester) async {
+      await pumpApp(tester, SpyGateway());
+      await connect(tester);
+      await tester.pump(const Duration(seconds: 2));
+      await goTo(tester, AppDestination.telemetry);
+
+      for (final key in ['chart_force_time', 'chart_speed_time', 'chart_force_stroke']) {
+        expect(find.byKey(Key(key)), findsOneWidget, reason: key);
+      }
+      expect(find.byKey(const Key('telemetry_no_errors')), findsOneWidget);
+      await disposeApp(tester);
+    });
+
+    testWidgets('um código de erro aparece na tabela de erros observados', (tester) async {
+      final gateway = SpyGateway();
+      await pumpApp(tester, gateway);
+      await connect(tester);
+      gateway.injectErrorCode(9);
+      await tester.pump(const Duration(seconds: 1));
+      await goTo(tester, AppDestination.telemetry);
+
+      expect(find.byKey(const Key('telemetry_errors_table')), findsOneWidget);
+      expect(find.text('9 (0x9)'), findsOneWidget);
+      await disposeApp(tester);
+    });
+
+    testWidgets('gravar e parar salva o CSV e mostra o caminho', (tester) async {
+      final exporter = FakeTelemetryExporter();
+      await pumpApp(tester, SpyGateway(), telemetryExporter: exporter);
+      await connect(tester);
+      await goTo(tester, AppDestination.telemetry);
+
+      await tester.tap(find.byKey(const Key('telemetry_record')));
+      await tester.pump(const Duration(seconds: 2));
+      await tester.tap(find.byKey(const Key('telemetry_record')));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(exporter.csvs, hasLength(1));
+      expect(exporter.csvs.single, startsWith('tsEpochMs,tsMonotonicMs,run,mode'));
+      expect(find.textContaining('/fake/telemetria_1.csv'), findsWidgets);
+      await tester.pump(const Duration(seconds: 5)); // some a mensagem da barra
+      await disposeApp(tester);
+    });
+
+    testWidgets('o teste de taxa mede os intervalos, mostra o resumo e salva o relatório', (tester) async {
+      final exporter = FakeTelemetryExporter();
+      await pumpApp(tester, SpyGateway(), telemetryExporter: exporter);
+      await connect(tester);
+      await goTo(tester, AppDestination.telemetry);
+      expect(isEnabled(tester, const Key('rate_test_start')), isTrue);
+      expect(isEnabled(tester, const Key('report_save')), isFalse);
+
+      await tester.tap(find.byKey(const Key('rate_test_start')));
+      await tester.pump(const Duration(seconds: 2));
+      expect(find.byKey(const Key('rate_test_progress')), findsOneWidget);
+      expect(isEnabled(tester, const Key('rate_test_start')), isFalse);
+
+      await tester.pump(const Duration(seconds: 50));
+
+      expect(find.byKey(const Key('rate_test_table')), findsOneWidget);
+      expect(find.byKey(const Key('rate_test_summary')), findsOneWidget);
+      expect(find.byKey(const Key('rate_test_progress')), findsNothing);
+      expect(isEnabled(tester, const Key('rate_test_start')), isTrue);
+
+      await tester.ensureVisible(find.byKey(const Key('report_save')));
+      await tester.tap(find.byKey(const Key('report_save')));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(exporter.reports, hasLength(1));
+      expect(exporter.reports.single, contains('Taxa de status por intervalo de polling'));
+      await tester.pump(const Duration(seconds: 5));
+      await disposeApp(tester);
+    });
+
+    testWidgets('o teste de taxa fica desabilitado sem conexão', (tester) async {
+      await pumpApp(tester, SpyGateway());
+      await goTo(tester, AppDestination.telemetry);
+
+      expect(isEnabled(tester, const Key('rate_test_start')), isFalse);
+      await disposeApp(tester);
+    });
+
     testWidgets('a telemetria mostra a taxa medida depois de conectar', (tester) async {
       await pumpApp(tester, SpyGateway());
       await connect(tester);
