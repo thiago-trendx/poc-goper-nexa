@@ -12,6 +12,7 @@ Jira: história GOPER-5978 (subtarefas por fase, GOPER-5979 a 5986). Perguntas e
 - `tools/maven/` — publica o `.aar` como `com.sunway:sdk850:1.0.0` em `maven-repo/` (`publish_sdk850.sh`; usa Gradle `maven-publish`, não precisa de Maven).
 - `maven-repo/` — repositório Maven local (opção A). O `.aar` nunca vai em `libs/`.
 - `docs/decisions/` — ADRs curtos, um por decisão nova.
+- `docs/guia-preparar-tablet.md` — como conferir e preparar outro tablet, instalar, conectar e pegar os arquivos (Fase 8 reduzida, ADR 0008).
 
 ## Regras
 - Trabalhe **uma fase por vez** (seção 8 do plano). Ao final de cada fase: `flutter analyze`, `flutter test` e `flutter build apk --debug` em `apps/workbench`, e resuma o que foi feito.
