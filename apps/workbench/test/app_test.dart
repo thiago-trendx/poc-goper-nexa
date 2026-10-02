@@ -59,6 +59,8 @@ Future<void> goTo(WidgetTester tester, AppDestination destination) async {
     matching: find.text(destination.label),
   ));
   await tester.pump(const Duration(milliseconds: 50));
+  // A tela carrega o estado inicial (por exemplo, ControlLoaded) depois do primeiro quadro.
+  await tester.pump(const Duration(milliseconds: 50));
 }
 
 Future<void> connect(WidgetTester tester) async {
@@ -100,6 +102,7 @@ void main() {
       final gateway = SpyGateway();
       await pumpApp(tester, gateway);
       await connect(tester);
+      await gateway.setForce(10);
       await gateway.start();
 
       await tester.tap(find.byKey(EmergencyStopButton.buttonKey));
@@ -143,6 +146,7 @@ void main() {
       final gateway = SpyGateway();
       await pumpApp(tester, gateway);
       await connect(tester);
+      await gateway.setForce(10);
       await goTo(tester, AppDestination.control);
       await tester.tap(find.byKey(const Key('control_start')));
       await tester.pump(const Duration(milliseconds: 100));
@@ -161,6 +165,7 @@ void main() {
       final gateway = SpyGateway();
       await pumpApp(tester, gateway);
       await connect(tester);
+      await gateway.setForce(10);
       await gateway.start();
 
       // O Flutter só aceita a sequência resumed -> inactive -> hidden -> paused.
@@ -188,13 +193,15 @@ void main() {
 
   group('painel de controle', () {
     testWidgets('comandos ficam desabilitados sem conexão e habilitam ao conectar', (tester) async {
-      await pumpApp(tester, SpyGateway());
+      final gateway = SpyGateway();
+      await pumpApp(tester, gateway);
       await goTo(tester, AppDestination.control);
       expect(isEnabled(tester, const Key('control_start')), isFalse);
       expect(isEnabled(tester, const Key('one_shot_origin')), isFalse);
       expect(tester.widget<Slider>(find.byKey(const Key('control_force'))).onChanged, isNull);
 
       await connect(tester);
+      await gateway.setForce(10);
       await goTo(tester, AppDestination.control);
 
       expect(isEnabled(tester, const Key('control_start')), isTrue);
@@ -207,6 +214,7 @@ void main() {
       final gateway = SpyGateway();
       await pumpApp(tester, gateway);
       await connect(tester);
+      await gateway.setForce(10);
       await goTo(tester, AppDestination.control);
       expect(isEnabled(tester, const Key('control_start')), isTrue);
 
@@ -226,7 +234,87 @@ void main() {
 
       final slider = tester.widget<Slider>(find.byKey(const Key('control_force')));
       expect(slider.max, 20);
-      expect(find.textContaining('limite do app: 20 kg'), findsOneWidget);
+      expect(slider.min, 5, reason: 'o mínimo é a força mínima da calibração, não zero');
+      expect(find.textContaining('fora da faixa (5 a 20 kg)'), findsOneWidget);
+      await disposeApp(tester);
+    });
+
+    testWidgets('Iniciar fica desabilitado com a carga fora da faixa e a tela explica', (tester) async {
+      await pumpApp(tester, SpyGateway());
+      await connect(tester);
+      await goTo(tester, AppDestination.control);
+
+      expect(isEnabled(tester, const Key('control_start')), isFalse);
+      expect(find.byKey(const Key('control_start_hint')), findsOneWidget);
+      expect(find.textContaining('ajuste a carga entre 5 e 30 kg'), findsOneWidget);
+      await disposeApp(tester);
+    });
+
+    testWidgets('Iniciar fica desabilitado sem o polling e a tela explica', (tester) async {
+      final gateway = SpyGateway();
+      await pumpApp(tester, gateway);
+      await connect(tester);
+      await gateway.setForce(10);
+      await tester.tap(find.byKey(const Key('polling_switch'))); // desliga o polling
+      await tester.pump(const Duration(milliseconds: 100));
+      await goTo(tester, AppDestination.control);
+
+      expect(isEnabled(tester, const Key('control_start')), isFalse);
+      expect(find.textContaining('ligue o polling na tela Conexão'), findsOneWidget);
+      await disposeApp(tester);
+    });
+
+    testWidgets('avisa em vermelho se o controlador ficar mudo com a máquina em execução', (tester) async {
+      final gateway = SpyGateway();
+      await pumpApp(tester, gateway);
+      await connect(tester);
+      await gateway.setForce(10);
+      await goTo(tester, AppDestination.control);
+      await tester.tap(find.byKey(const Key('control_start')));
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(find.text('Em execução'), findsOneWidget);
+      expect(find.byKey(const Key('control_silent_warning')), findsNothing);
+
+      await gateway.stopPolling(); // o controlador deixa de responder
+      await tester.pump(const Duration(seconds: 5));
+
+      expect(find.byKey(const Key('control_silent_warning')), findsOneWidget);
+      expect(find.textContaining('com a máquina em execução'), findsOneWidget);
+      await disposeApp(tester);
+    });
+
+    testWidgets('Iniciar aplica a carga e a máquina passa a informar execução', (tester) async {
+      final gateway = SpyGateway();
+      await pumpApp(tester, gateway);
+      await connect(tester);
+      await gateway.setForce(10);
+      await goTo(tester, AppDestination.control);
+      expect(find.text('Carga: 10 kg (faixa 5 a 30 kg; limite do app: 30 kg)'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('control_start')));
+      await tester.pump(const Duration(milliseconds: 600));
+
+      expect(gateway.controlSnapshot.run, RunState.running);
+      expect(find.text('Em execução'), findsOneWidget);
+      expect(find.byKey(const Key('control_start_hint')), findsNothing);
+      await disposeApp(tester);
+    });
+
+    testWidgets('os coeficientes mostram a faixa de cada modo', (tester) async {
+      await pumpApp(tester, SpyGateway());
+      await connect(tester);
+      await goTo(tester, AppDestination.control);
+
+      for (final (label, expected) in [
+        ('Concêntrico', 'Concêntrico (0–6)'),
+        ('Excêntrico', 'Excêntrico (0–6)'),
+        ('Elástico', 'Elástico (0–10)'),
+      ]) {
+        await tester.tap(find.text(label).first);
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(find.text(expected), findsOneWidget, reason: label);
+      }
+      expect(find.textContaining('Curso elástico (1–200 cm)'), findsOneWidget);
       await disposeApp(tester);
     });
 

@@ -6,7 +6,7 @@ import 'package:sdk850_bridge/sdk850_bridge.dart';
 /// Única dona do [MachineGateway]. Blocs e widgets falam só com o repositório,
 /// que expõe os eventos do gateway em streams por tipo.
 class MachineRepository {
-  MachineRepository(this._gateway, {this.spFileName = 'workbench850_prefs'}) {
+  MachineRepository(this._gateway, {this.spFileName = 'workbench850_prefs', this.maxForceKg}) {
     _subscription = _gateway.events.listen(_events.add, onError: _eventErrors.add);
     connections.listen(_onConnection);
   }
@@ -15,6 +15,10 @@ class MachineRepository {
 
   /// Nome do arquivo de SharedPreferences usado pelo SDK (`DeviceManager.init`).
   final String spFileName;
+
+  /// Limite de força de segurança do app, repassado ao lado nativo para ele recusar força acima dele
+  /// mesmo que haja um erro nesta camada.
+  final int? maxForceKg;
 
   final StreamController<MachineEvent> _events = StreamController.broadcast();
   final StreamController<Object> _eventErrors = StreamController.broadcast();
@@ -64,7 +68,7 @@ class MachineRepository {
 
   Future<void> _initialize() async {
     try {
-      await _gateway.initialize(spFileName: spFileName, logEnabled: kDebugMode);
+      await _gateway.initialize(spFileName: spFileName, logEnabled: kDebugMode, maxForceKg: maxForceKg);
     } catch (_) {
       _initialization = null;
       rethrow;

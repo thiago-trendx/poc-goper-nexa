@@ -58,7 +58,7 @@ class WorkbenchApp extends StatelessWidget {
         RepositoryProvider<LogExporter>.value(value: logExporter),
         RepositoryProvider<ProfileStore>.value(value: profileStore),
         RepositoryProvider<MachineRepository>(
-          create: (_) => MachineRepository(gateway),
+          create: (_) => MachineRepository(gateway, maxForceKg: limits.maxForceKg),
           dispose: (repository) => unawaited(repository.dispose()),
           lazy: false,
         ),
@@ -82,6 +82,7 @@ class WorkbenchApp extends StatelessWidget {
               context.read<MachineRepository>(),
               limits: limits,
               forceDebounce: forceDebounce,
+              minForceKg: () => context.read<DeviceParamsBloc>().state.params.minForce,
             )..add(const ControlLoaded()),
           ),
           BlocProvider(

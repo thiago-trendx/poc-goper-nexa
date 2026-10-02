@@ -160,20 +160,33 @@ class ControlBloc extends Bloc<ControlEvent, ControlState> {
     this._repository, {
     this.limits = const SafetyLimits(),
     this.forceDebounce = const Duration(milliseconds: 150),
+    this.minForceKg = _defaultMinForceKg,
   }) : super(const ControlState()) {
     on<ControlCommand>(_onCommand, transformer: sequential());
     on<StopPressed>(_onStop, transformer: concurrent());
     on<ForceChanged>(_onForceChanged, transformer: restartable());
     on<_StatusReceived>(
-      (event, emit) => emit(state.copyWith(reportedRun: event.status.run)),
+      // O status chega o tempo todo; ele só atualiza o estado reportado e preserva o último erro.
+      (event, emit) => emit(ControlState(
+        snapshot: state.snapshot,
+        reportedRun: event.status.run,
+        error: state.error,
+        errorSeq: state.errorSeq,
+      )),
     );
 
     _statusSubscription = _repository.statuses.listen((s) => add(_StatusReceived(s)));
   }
 
+  /// Força mínima da calibração (`DeviceParams.minForce`); o padrão é o valor do painel original.
+  static int _defaultMinForceKg() => 5;
+
   final MachineRepository _repository;
   final SafetyLimits limits;
   final Duration forceDebounce;
+
+  /// Lê a força mínima atual da calibração (muda se os parâmetros forem enviados).
+  final int Function() minForceKg;
   late final StreamSubscription<DeviceStatus> _statusSubscription;
 
   Future<void> _onCommand(ControlCommand command, Emitter<ControlState> emit) => switch (command) {
@@ -209,18 +222,51 @@ class ControlBloc extends Bloc<ControlEvent, ControlState> {
     }
   }
 
-  Future<void> _onStart(StartPressed event, Emitter<ControlState> emit) =>
-      _run(emit, _repository.start, (s) => s.copyWith(run: RunState.running));
+  /// Só inicia com uma força válida (faixa da calibração e limite do app): o valor padrão dos
+  /// `ControlParams` não é conhecido, então a força definida na tela é reafirmada antes do início.
+  Future<void> _onStart(StartPressed event, Emitter<ControlState> emit) async {
+    final min = minForceKg();
+    final range = limits.forceRange(min);
+    if (range == null) {
+      emit(state.copyWith(
+        error: 'O limite de carga do app (${limits.maxForceKg} kg) está abaixo da força mínima ($min kg)',
+      ));
+      return;
+    }
+    final force = state.snapshot.force;
+    if (force < range.min || force > range.max) {
+      emit(state.copyWith(error: 'Defina a carga entre ${range.min} e ${range.max} kg antes de iniciar'));
+      return;
+    }
+    await _run(
+      emit,
+      () async {
+        await _repository.setForce(force);
+        await _repository.start();
+      },
+      (s) => s.copyWith(run: RunState.running),
+    );
+  }
 
   Future<void> _onStop(StopPressed event, Emitter<ControlState> emit) =>
       _run(emit, _repository.stop, (s) => s.copyWith(run: RunState.stop));
 
   Future<void> _onForceChanged(ForceChanged event, Emitter<ControlState> emit) async {
-    final kg = limits.clampForce(event.kg);
-    final exceeded = kg != event.kg;
+    final min = minForceKg();
+    if (limits.forceRange(min) == null) {
+      emit(state.copyWith(
+        error: 'O limite de carga do app (${limits.maxForceKg} kg) está abaixo da força mínima ($min kg)',
+      ));
+      return;
+    }
+    final kg = limits.clampForce(event.kg, minForceKg: min);
     emit(state.copyWith(
       snapshot: state.snapshot.copyWith(force: kg),
-      error: exceeded ? 'Limite de carga do app: ${limits.maxForceKg} kg' : null,
+      error: switch (event.kg) {
+        _ when event.kg > limits.maxForceKg => 'Limite de carga do app: ${limits.maxForceKg} kg',
+        _ when event.kg < min => 'Força mínima da calibração: $min kg',
+        _ => null,
+      },
     ));
     await Future<void>.delayed(forceDebounce);
     if (emit.isDone) return; // substituído por um valor mais novo

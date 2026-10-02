@@ -68,3 +68,29 @@ Ainda não se sabe se `velocidade` e `repetições` passam a variar em `RUNNING`
 
 ## Pendências da Fase 2 para fechar o checklist
 - Testar `connect` manual e a reconexão com a máquina reiniciada (opcional).
+
+## Fase 4 — controle (2026-10-02)
+Tudo abaixo é **observado, não confirmado pelo fabricante**. Execuções feitas pelo usuário na bancada, com parada física ao alcance.
+
+### Conexão
+- `autoConnect` falhou uma vez: `ttyS9` abriu com `fd = -1` ("native openSerialPort returns null") e `ttyS2`/`ttyS8` abriram mas não responderam ao handshake. A mensagem em chinês `未找到可用串口` só diz "nenhuma porta disponível". Depois de `am force-stop com.oma.doublecontrol` a conexão funcionou; hipótese: o app do fornecedor segura a `ttyS9`. Não se sabe qual processo segurava.
+
+### Protocolo do comando de controle (`01 64 ...`)
+- Byte 3: `FB` = STOP, `FA` = execução.
+- Força em unidades de 0,1 kg em dois campos (bytes 4-5 e 6-7): 5 kg = `0x32`, 10 = `0x64`, 22 = `0xDC`, 30 = `0x12C`. O primeiro varia com o modo (concêntrico/excêntrico); o segundo mantém a força definida.
+- Byte 15 = força de compensação (10 → 5 → 4 → 3 → 2 → 0 → 1 → 6 → 5 aceitos em STOP).
+- No elástico apareceu `04` no byte 2 (nos outros modos fica `00`); significado não confirmado.
+- A máquina confirma cada `CONTROL` em ~90 ms.
+
+### Fórmulas do guia
+- Concêntrico `força×(1−coef×0,1)+0,5`: com 22 kg e coef. 5, 4, 3, 2 enviou 11, 13, 15 e 18 kg.
+- Excêntrico `força×(1+coef×0,1)+0,5`: com 5 kg e coef. 3 e 5 enviou 7 e 8 kg.
+- Resultado truncado em kg inteiro. Trocar coeficiente com a máquina em execução foi aceito.
+
+### Telemetria em execução
+- `força real` ficou em 0 com 5 kg (Padrão e Elástico) e chegou a 22 (Padrão, 22 kg) e 16 (Concêntrico, 22 kg); pode haver limiar.
+- `repetições` passou a contar (1 a 3). `velocidade` ficou em 0,0 em todos os testes. Em STOP, `força` reportada é 0.
+- Proteção 51 foi aceita; elástico (coef. 5, curso 50 cm) rodou sem erro.
+
+### Pendências
+- Efeito de cada campo em STOP; comportamento ao parar o polling com a máquina em execução; escala do coeficiente elástico; por que `velocidade` fica em 0.

@@ -15,9 +15,15 @@ class SafetyLimits extends Equatable {
   /// Maior força, em kg, que o slider e o `ControlBloc` aceitam.
   final int maxForceKg;
 
-  bool allowsForce(int kg) => kg >= 0 && kg <= maxForceKg;
+  /// Faixa de força válida: da força mínima da calibração ([minForceKg]) até [maxForceKg].
+  /// Nula quando o limite do app está abaixo do mínimo (nenhuma força é válida).
+  ({int min, int max})? forceRange(int minForceKg) =>
+      maxForceKg < minForceKg ? null : (min: minForceKg, max: maxForceKg);
 
-  int clampForce(int kg) => kg.clamp(0, maxForceKg);
+  bool allowsForce(int kg, {int minForceKg = 0}) => kg >= minForceKg && kg <= maxForceKg;
+
+  /// Só use com [forceRange] não nulo.
+  int clampForce(int kg, {int minForceKg = 0}) => kg.clamp(minForceKg, maxForceKg);
 
   @override
   List<Object?> get props => [maxForceKg];

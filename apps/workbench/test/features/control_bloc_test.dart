@@ -35,6 +35,9 @@ void main() {
       build: build,
       act: (bloc) async {
         await connect();
+        await repository.startPolling(intervalMs: 20);
+        bloc.add(const ForceChanged(10));
+        await Future<void>.delayed(_settle);
         bloc.add(const StartPressed());
         await Future<void>.delayed(_settle);
         expect(gateway.controlSnapshot.run, RunState.running);
@@ -50,7 +53,7 @@ void main() {
     blocTest<ControlBloc, ControlState>(
       'sem conexão o comando falha e o erro é publicado',
       build: build,
-      act: (bloc) => bloc.add(const StartPressed()),
+      act: (bloc) => bloc.add(const ModeChanged(ForceMode.elastic)),
       wait: _settle,
       expect: () => [
         const ControlState(error: 'Sem conexão com a máquina', errorSeq: 1),
@@ -63,6 +66,7 @@ void main() {
       act: (bloc) async {
         await connect();
         await repository.startPolling(intervalMs: 10);
+        await repository.setForce(10);
         await repository.start();
       },
       wait: const Duration(milliseconds: 100),
@@ -79,6 +83,109 @@ void main() {
       },
       wait: _settle,
       verify: (bloc) => expect(bloc.state.snapshot.mode, ForceMode.elastic),
+    );
+  });
+
+  group('início seguro (Fase 4)', () {
+    blocTest<ControlBloc, ControlState>(
+      'Iniciar com a carga fora da faixa pede para definir a carga e não envia nada',
+      build: build,
+      act: (bloc) async {
+        await connect();
+        await repository.startPolling(intervalMs: 20);
+        bloc.add(const StartPressed()); // força 0: o valor inicial é inválido
+      },
+      wait: _settle,
+      verify: (bloc) {
+        expect(bloc.state.error, 'Defina a carga entre 5 e 30 kg antes de iniciar');
+        expect(bloc.state.snapshot.run, RunState.stop);
+        expect(gateway.controlSnapshot.run, RunState.stop);
+        expect(gateway.forces, isEmpty, reason: 'nada foi enviado à máquina');
+      },
+    );
+
+    blocTest<ControlBloc, ControlState>(
+      'Iniciar reafirma a carga definida e só então inicia',
+      build: build,
+      act: (bloc) async {
+        await connect();
+        await repository.startPolling(intervalMs: 20);
+        bloc.add(const ForceChanged(12));
+        await Future<void>.delayed(_settle);
+        gateway.calls.clear();
+        bloc.add(const StartPressed());
+      },
+      wait: _settle,
+      verify: (bloc) {
+        expect(gateway.forces, [12, 12], reason: 'uma vez pelo slider e outra ao iniciar');
+        expect(gateway.calls, ['setForce:start', 'setForce:done']);
+        expect(gateway.controlSnapshot.run, RunState.running);
+        expect(bloc.state.snapshot.run, RunState.running);
+      },
+    );
+
+    blocTest<ControlBloc, ControlState>(
+      'Iniciar com o polling desligado publica o motivo e não inicia',
+      build: build,
+      act: (bloc) async {
+        await connect();
+        bloc.add(const ForceChanged(10));
+        await Future<void>.delayed(_settle);
+        bloc.add(const StartPressed());
+      },
+      wait: _settle,
+      verify: (bloc) {
+        expect(bloc.state.error, contains('Ligue o polling antes de iniciar'));
+        expect(gateway.controlSnapshot.run, RunState.stop);
+        expect(bloc.state.snapshot.run, RunState.stop);
+      },
+    );
+
+    blocTest<ControlBloc, ControlState>(
+      'com o limite do app abaixo da força mínima nenhuma carga é válida e Iniciar explica',
+      build: () => build(limits: const SafetyLimits(maxForceKg: 3)),
+      act: (bloc) async {
+        await connect();
+        await repository.startPolling(intervalMs: 20);
+        bloc
+          ..add(const ForceChanged(3))
+          ..add(const StartPressed());
+      },
+      wait: _settle,
+      verify: (bloc) {
+        expect(bloc.state.error, 'O limite de carga do app (3 kg) está abaixo da força mínima (5 kg)');
+        expect(gateway.forces, isEmpty);
+        expect(gateway.controlSnapshot.run, RunState.stop);
+      },
+    );
+
+    blocTest<ControlBloc, ControlState>(
+      'carga abaixo da força mínima da calibração sobe para o mínimo e avisa',
+      build: build,
+      act: (bloc) async {
+        await connect();
+        bloc.add(const ForceChanged(2));
+      },
+      wait: _debounce * 4,
+      verify: (bloc) {
+        expect(bloc.state.snapshot.force, 5);
+        expect(bloc.state.errorSeq, 1);
+        expect(gateway.forces, [5]);
+      },
+    );
+
+    blocTest<ControlBloc, ControlState>(
+      'a força mínima vem da calibração atual, não de um valor fixo',
+      build: () => ControlBloc(repository, forceDebounce: _debounce, minForceKg: () => 8),
+      act: (bloc) async {
+        await connect();
+        bloc.add(const ForceChanged(6));
+      },
+      wait: _debounce * 4,
+      verify: (bloc) {
+        expect(bloc.state.snapshot.force, 8);
+        expect(gateway.forces, [8]);
+      },
     );
   });
 

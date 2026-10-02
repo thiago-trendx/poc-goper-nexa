@@ -9,6 +9,8 @@ import '../../shared/safety/safety_limits.dart';
 import '../../shared/widgets/feedback.dart';
 import '../connection/connection_bloc.dart';
 import '../device_params/device_params_bloc.dart';
+import '../telemetry/telemetry_bloc.dart';
+import '../telemetry/telemetry_page.dart';
 import 'control_bloc.dart';
 
 /// Painel de controle. Ao sair desta tela envia `stop()` e para o polling.
@@ -27,6 +29,8 @@ class _ControlPageState extends State<ControlPage> {
   void initState() {
     super.initState();
     _repository = context.read<MachineRepository>();
+    // Sincroniza com os ControlParams atuais ao abrir a tela (leitura local, não envia nada).
+    context.read<ControlBloc>().add(const ControlLoaded());
   }
 
   @override
@@ -64,6 +68,11 @@ class _ControlPageState extends State<ControlPage> {
     final limits = context.read<SafetyLimits>();
     final connected = context.watch<ConnectionBloc>().state.isConnected;
     final velocityRange = context.select((DeviceParamsBloc b) => b.state.params.velocityRange);
+    final minForce = context.select((DeviceParamsBloc b) => b.state.params.minForce);
+    final maxLength = context.select((DeviceParamsBloc b) => b.state.params.maxLength);
+    final pollingActive = context.select((ConnectionBloc b) => b.state.pollingActive);
+    final forceRange = limits.forceRange(minForce);
+    final silentSeconds = context.select((TelemetryBloc b) => b.state.silentSeconds);
 
     return BlocConsumer<ControlBloc, ControlState>(
       listenWhen: (previous, current) => previous.errorSeq != current.errorSeq,
@@ -72,12 +81,24 @@ class _ControlPageState extends State<ControlPage> {
       },
       builder: (context, state) {
         final snapshot = state.snapshot;
+        final forceValid = forceRange != null && snapshot.force >= forceRange.min && snapshot.force <= forceRange.max;
+        final canStart = connected && pollingActive && forceValid;
         ValueChanged<int>? onCoefficient(CoefficientKind kind) =>
             connected ? (value) => bloc.add(CoefficientChanged(kind, value)) : null;
 
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            if (state.reportedRun == RunState.running && silentSeconds >= TelemetryPage.silentWarningSeconds)
+              Card(
+                key: const Key('control_silent_warning'),
+                color: Theme.of(context).colorScheme.errorContainer,
+                child: ListTile(
+                  leading: const Icon(Icons.warning_amber),
+                  title: Text('Sem resposta do controlador há $silentSeconds s com a máquina em execução'),
+                  subtitle: const Text('Toque em STOP e verifique a máquina antes de continuar.'),
+                ),
+              ),
             Section(
               title: 'Estado',
               child: Column(
@@ -97,22 +118,39 @@ class _ControlPageState extends State<ControlPage> {
             ),
             Section(
               title: 'Execução',
-              child: Wrap(
-                spacing: 12,
-                runSpacing: 12,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  FilledButton.icon(
-                    key: const Key('control_start'),
-                    onPressed: connected ? () => bloc.add(const StartPressed()) : null,
-                    icon: const Icon(Icons.play_arrow),
-                    label: const Text('Iniciar'),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      FilledButton.icon(
+                        key: const Key('control_start'),
+                        onPressed: canStart ? () => bloc.add(const StartPressed()) : null,
+                        icon: const Icon(Icons.play_arrow),
+                        label: const Text('Iniciar'),
+                      ),
+                      OutlinedButton.icon(
+                        key: const Key('control_stop'),
+                        onPressed: connected ? () => bloc.add(const StopPressed()) : null,
+                        icon: const Icon(Icons.pause),
+                        label: const Text('Parar'),
+                      ),
+                    ],
                   ),
-                  OutlinedButton.icon(
-                    key: const Key('control_stop'),
-                    onPressed: connected ? () => bloc.add(const StopPressed()) : null,
-                    icon: const Icon(Icons.pause),
-                    label: const Text('Parar'),
-                  ),
+                  if (connected && !canStart) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      key: const Key('control_start_hint'),
+                      !pollingActive
+                          ? 'Para iniciar, ligue o polling na tela Conexão: sem ele a máquina não recebe o STOP.'
+                          : forceRange == null
+                              ? 'O limite de carga do app (${limits.maxForceKg} kg) está abaixo da força mínima ($minForce kg).'
+                              : 'Para iniciar, ajuste a carga entre ${forceRange.min} e ${forceRange.max} kg.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -129,15 +167,19 @@ class _ControlPageState extends State<ControlPage> {
               ),
             ),
             Section(
-              title: 'Carga: ${snapshot.force} kg (limite do app: ${limits.maxForceKg} kg)',
+              title: forceRange == null
+                  ? 'Carga: indisponível (limite do app ${limits.maxForceKg} kg abaixo da força mínima $minForce kg)'
+                  : forceValid
+                      ? 'Carga: ${snapshot.force} kg (faixa ${forceRange.min} a ${forceRange.max} kg; limite do app: ${limits.maxForceKg} kg)'
+                      : 'Carga: ${snapshot.force} kg, fora da faixa (${forceRange.min} a ${forceRange.max} kg): ajuste o slider',
               child: Slider(
                 key: const Key('control_force'),
-                value: snapshot.force.clamp(0, limits.maxForceKg).toDouble(),
-                min: 0,
-                max: limits.maxForceKg.toDouble(),
-                divisions: limits.maxForceKg,
+                value: forceRange == null ? 0 : snapshot.force.clamp(forceRange.min, forceRange.max).toDouble(),
+                min: forceRange == null ? 0 : forceRange.min.toDouble(),
+                max: forceRange == null ? 1 : (forceRange.max == forceRange.min ? forceRange.max + 1.0 : forceRange.max.toDouble()),
+                divisions: forceRange == null || forceRange.max == forceRange.min ? null : forceRange.max - forceRange.min,
                 label: '${snapshot.force} kg',
-                onChanged: connected ? (value) => bloc.add(ForceChanged(value.round())) : null,
+                onChanged: connected && forceRange != null ? (value) => bloc.add(ForceChanged(value.round())) : null,
               ),
             ),
             Section(
@@ -145,13 +187,15 @@ class _ControlPageState extends State<ControlPage> {
               child: switch (snapshot.mode) {
                 ForceMode.standard => const Text('Modo padrão: sem coeficientes'),
                 ForceMode.centripetal => IntStepper(
-                    label: 'Concêntrico',
+                    label: 'Concêntrico (0–6)',
                     value: snapshot.centripetal,
+                    max: 6,
                     onChanged: onCoefficient(CoefficientKind.centripetal),
                   ),
                 ForceMode.centrifugal => IntStepper(
-                    label: 'Excêntrico',
+                    label: 'Excêntrico (0–6)',
                     value: snapshot.centrifugal,
+                    max: 6,
                     onChanged: onCoefficient(CoefficientKind.centrifugal),
                   ),
                 ForceMode.velocity => IntStepper(
@@ -164,13 +208,16 @@ class _ControlPageState extends State<ControlPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       IntStepper(
-                        label: 'Elástico',
+                        label: 'Elástico (0–10)',
                         value: snapshot.elastic,
+                        max: 10,
                         onChanged: onCoefficient(CoefficientKind.elastic),
                       ),
                       IntStepper(
-                        label: 'Elástico máximo',
+                        label: 'Curso elástico (1–$maxLength cm)',
                         value: snapshot.maxElectric,
+                        min: 1,
+                        max: maxLength,
                         onChanged: connected ? (value) => bloc.add(ElasticMaxChanged(value)) : null,
                       ),
                     ],

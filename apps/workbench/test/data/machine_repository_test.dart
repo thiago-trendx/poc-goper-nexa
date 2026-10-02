@@ -146,8 +146,9 @@ void main() {
         final repository = MachineRepository(gateway);
         repository.autoConnect();
         async.elapse(const Duration(milliseconds: 10));
-        repository.start();
         repository.startPolling(intervalMs: 100);
+        repository.setForce(10);
+        repository.start();
         async.flushMicrotasks();
 
         repository.haltForSafety();
@@ -191,6 +192,7 @@ class _CountingGateway extends FakeMachineGateway {
 
   int initializeCalls = 0;
   String? spFileName;
+  int? maxForceKg;
 
   @override
   Future<void> initialize({
@@ -199,10 +201,12 @@ class _CountingGateway extends FakeMachineGateway {
     int? sendIntervalMs,
     int? testTimeMs,
     bool? logEnabled,
+    int? maxForceKg,
   }) {
     initializeCalls++;
     this.spFileName = spFileName;
-    return super.initialize(spFileName: spFileName);
+    this.maxForceKg = maxForceKg;
+    return super.initialize(spFileName: spFileName, maxForceKg: maxForceKg);
   }
 }
 
