@@ -76,7 +76,8 @@ adb pull /sdcard/Android/data/com.goper.poc_goper_nexa/files/<arquivo> .
 ## 7. Segurança (resumo; o completo está no plano, seção 7.5)
 - O botão **STOP** fica fixo em todas as telas.
 - O limite de carga do app vale também no código nativo.
-- Ao sair da tela Controle ou ir para segundo plano, o app envia STOP e para o polling.
+- Ao fechar o app ou ir para segundo plano, o app envia STOP e para o polling. Trocar de tela **não** para a máquina: o indicador "EM EXECUÇÃO" aparece na barra de qualquer tela, e o STOP fixo continua embaixo.
+- Desconectar e desligar o polling enviam STOP antes. Parâmetros e firmware só com a máquina parada.
 - Origem, reset de erro e limpar dados pedem confirmação; autoteste e ajuste de posição dos motores também.
 - A máquina nunca reinicia sozinha depois de um ajuste.
 - Nunca versione credenciais, chaves de assinatura nem o `release.jks` do demo.

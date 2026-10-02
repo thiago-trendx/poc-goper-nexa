@@ -372,7 +372,7 @@ apps/workbench/lib/
 - **Limite de carga no app.** O `SafetyLimits.maxForceKg` é configurável, com padrão abaixo do `maxForce` do dispositivo. O slider não ultrapassa esse limite.
 - **Ações que movem motores ou alteram calibração pedem confirmação**: autoteste, ajuste de posição, envio de `DeviceParams` e instalação de firmware.
 - **Perda de conexão ou exceção:** a UI mostra um estado de erro claro e desabilita os comandos.
-- **Ao sair da tela de controle ou fechar o app:** enviar `stop()` e parar o polling.
+- **Ao fechar o app ou enviá-lo para segundo plano:** enviar `stop()` e parar o polling. **Alterado em 2026-10-02 (ADR 0009, decisão do usuário):** sair da tela de controle não para mais a máquina nem o polling; no lugar, o indicador "EM EXECUÇÃO" aparece em todas as telas, desconectar e desligar o polling enviam STOP antes, e parâmetros e firmware só com a máquina parada.
 
 ### 7.6 Build e ambiente
 
@@ -419,6 +419,9 @@ apps/workbench/lib/
 6. Qual é o comportamento esperado de cada comando de disparo único? Por quantos ciclos o flag deve permanecer ativo?
 7. Qual nome de método é o correto: `setMaxElectric` ou `setMaxElectricLength`? A fórmula do modo elástico do guia está correta?
 8. Existe algum termo de licença de uso e redistribuição do `.aar`?
+9. Existe parâmetro, campo ou comando para controlar a velocidade do ajuste dos motores de elevação (banco/assento e braço)? A lentidão observada é um limite do hardware, do firmware ou de configuração? *(Pedido pela equipe de produto, 2026-10-02. O guia, o Javadoc e o demo não mostram nenhum controle de velocidade do ajuste; `ratedSpeed` e `velocity` são de outras funções.)*
+10. Qual é o valor de `Contancts.MOTOR_LONG_TIME` (tempo por nível) de cada modelo de motor? Qual é a faixa válida e o valor padrão das posições (níveis) dos motores 1 e 2? Qual dos dois é o do assento e qual é o do braço?
+11. O que significa a luz vermelha da máquina depois de uma execução e o que a libera? Observado: ela fica vermelha ao iniciar, continua vermelha depois do STOP (a máquina responde STOP e o cabo solta) e só volta a verde quando o polling é interrompido (ver `docs/checklist-hardware.md`, Fase 6).
 
 ## 11. Instruções para o Claude Code
 

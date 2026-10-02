@@ -14,7 +14,7 @@ A Fase 4 move a máquina: `start`/`stop`, força, modo, coeficientes, curso elá
 ### Início seguro
 - O polling sempre começa em `STOP`. `start` só é aceito com o polling ligado e com a força dentro da faixa; ao iniciar, a força é reenviada antes do `start`.
 - Se o polling parar, o estado local volta a `STOP`.
-- Ao sair da tela Controle ou ir para segundo plano: `stop`, espera de 2 ciclos e parada do polling (`haltForSafety`) (decisão do usuário). A telemetria deixa de chegar depois disso.
+- Ao sair da tela Controle ou ir para segundo plano: `stop`, espera de 2 ciclos e parada do polling (`haltForSafety`) (decisão do usuário). A telemetria deixa de chegar depois disso. **Substituído em parte pelo ADR 0009:** sair da tela Controle deixou de parar a máquina; segundo plano e fechar o app continuam.
 - O botão STOP vai direto ao repositório e nunca espera a fila de comandos.
 
 ### Faixas (do demo/Javadoc)

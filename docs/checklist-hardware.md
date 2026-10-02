@@ -112,3 +112,23 @@ Só leitura de dados; com a máquina parada o teste de taxa é seguro. Salvar os
 2. **Gráficos com movimento:** modo Padrão, 5 kg, puxar o cabo devagar por ~20 s, com a parada física ao alcance. Conferir que força real × tempo, velocidade × tempo e força × curso acompanham o movimento (lembrando que `real` foi 0 com 5 kg na Fase 4 e que `velocidade` só mostrou 0,0 e 43,0 em STOP).
 3. **CSV:** gravar ~30 s com movimento, parar e abrir o arquivo; conferir o cabeçalho, o número de linhas (~4 por segundo a 200 ms) e que `tsMonotonicMs` cresce de forma regular.
 4. **Erros observados:** se algum `errorCode` aparecer, anotar o código, o que estava acontecendo e se o reset de erro o limpou.
+
+## Fase 6 — resultados na bancada (2026-10-02, build debug)
+Tudo abaixo é **observado, não confirmado pelo fabricante**.
+
+### A1 — teste de taxa (relatório salvo antes do fim: só 200 e 100 ms)
+| Intervalo | Recebidos (15 s) | Taxa | Resposta | Maior pausa |
+| --- | --- | --- | --- | --- |
+| 200 ms | 68 | 4,3 Hz | 91% | 716 ms |
+| 100 ms | 121 | 7,9 Hz | 81% | 520 ms |
+O 50 ms não foi medido (o relatório foi salvo durante o teste). Os dois valores batem com a Fase 2.
+
+### A2 e A3 — execução em Padrão, 5 kg, com movimento
+- Os três gráficos acompanham o cabo (confirmado pelo usuário). CSV de 34,4 s: 163 linhas, 4,7 Hz, **nenhuma pausa > 1 s**, sem erro diferente de 0.
+- Em execução, `velocidade` só assume **0 e 43** e `força real` só **0 e 5** (a carga comandada), de novo; `repetições` contam (22 → 51 numa execução).
+- No A2 houve silêncios de 3 e 7 s do controlador com a máquina em movimento; não se repetiram no A3. A causa não foi identificada (hipótese: trocas de tela ou toggles do polling no momento).
+
+### Luz da máquina depois de executar
+- Ao iniciar a luz vai de verde para vermelha. Ao dar **STOP** a resistência do cabo **solta na hora**, a máquina responde STOP (resposta idêntica à de antes de iniciar, só muda a contagem de repetições), **mas a luz continua vermelha com o polling ligado, por mais de 5 minutos**.
+- Ela só volta a verde quando o polling é desligado; ao religar o polling ela continua verde.
+- Não é um STOP perdido (o log mostra o `FB` enviado e a resposta STOP) e não há byte da resposta que reflita a luz. A equipe de engenharia não sabe o que a luz significa. **Pergunta ao fabricante:** o que a luz vermelha indica e o que a libera (STOP não libera)?

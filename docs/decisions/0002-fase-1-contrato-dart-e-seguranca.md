@@ -19,6 +19,7 @@ A Fase 1 entrega os modelos Dart, o `MachineGateway`, o `FakeMachineGateway`, o 
 - `SafetyLimits.maxForceKg` tem padrão **30 kg**, abaixo do menor `maxForce` possível do dispositivo (50 kg), para os primeiros testes serem com carga baixa. Configurável por `--dart-define=MAX_FORCE_KG`. `ControlBloc` corta valores acima do limite e avisa; o slider não passa dele.
 - Ao sair da tela de controle, ao enviar o app para segundo plano (`paused`) ou ao fechá-lo (`detached`), o app chama `MachineRepository.haltForSafety()`: envia `stop()`, espera **dois ciclos de polling** e então para o polling. A espera existe porque o `stop()` só altera o `ControlParams`; ele segue para o controlador no próximo ciclo. **Requisito para a Fase 2/4:** o `stop()` nativo deve enviar um `Cmd.control` imediatamente, sem esperar o próximo ciclo.
 - Consequência: sair da tela de controle para o polling; a telemetria só volta quando o polling for religado na tela de conexão.
+- **Substituído em parte pelo ADR 0009:** sair da tela de controle deixou de parar a máquina e o polling. Segundo plano e fechar o app continuam como acima.
 
 ### Blocs
 - Em cada Bloc, comandos de tipos diferentes entram numa **fila única** (`sequential`), por um handler sobre um tipo base selado (`ControlCommand`, `ConnectionCommand`, `DeviceParamsEvent`). Motivo: `sequential()` só serializa dentro de um mesmo tipo de evento, e comandos de tipos diferentes chegariam à máquina fora de ordem.

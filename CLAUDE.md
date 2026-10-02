@@ -18,7 +18,7 @@ Jira: história GOPER-5978 (subtarefas por fase, GOPER-5979 a 5986). Perguntas e
 - Trabalhe **uma fase por vez** (seção 8 do plano). Ao final de cada fase: `flutter analyze`, `flutter test` e `flutter build apk --debug` em `apps/workbench`, e resuma o que foi feito.
 - Nomes de API do SDK vêm do Javadoc (`third_party/sdk850/javadoc/`) e do demo. Não invente métodos e **não descompile o `.aar`**. Se algo não estiver documentado, pare e pergunte.
 - Qualquer mudança no contrato do canal (seção 6.2) é proposta antes e registrada em ADR.
-- **Nunca remova nem enfraqueça** os requisitos de segurança da seção 7.5 (STOP fixo, limite de carga, confirmações, estado de erro, stop ao sair).
+- **Nunca remova nem enfraqueça** os requisitos de segurança da seção 7.5 (STOP fixo, limite de carga, confirmações, estado de erro, STOP ao fechar o app ou ir para segundo plano, e STOP antes de desconectar ou desligar o polling; sair da tela de Controle **não** para mais a máquina, por decisão do usuário no ADR 0009).
 - **Nunca versione** credenciais, chaves de assinatura, `key.properties` nem o `release.jks` do demo.
 - Itens que dependem de hardware estão listados na memória do projeto (perguntas verificáveis na bancada); registre o que for observado como "observado, não confirmado pelo fabricante".
 - Comentários e mensagens de commit em português. Identificadores de código em inglês.
