@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sdk850_bridge/sdk850_bridge.dart';
 
-import '../../data/machine_repository.dart';
 import '../../shared/safety/safety_limits.dart';
 import '../../shared/widgets/feedback.dart';
 import '../connection/connection_bloc.dart';
@@ -14,7 +13,8 @@ import '../telemetry/telemetry_bloc.dart';
 import '../telemetry/telemetry_page.dart';
 import 'control_bloc.dart';
 
-/// Painel de controle. Ao sair desta tela envia `stop()` e para o polling.
+/// Painel de controle. Sair desta tela **não** para a máquina nem o polling (ADR 0009): o STOP
+/// fixo, o indicador "em execução" e o STOP ao fechar o app ou ir para segundo plano continuam.
 class ControlPage extends StatefulWidget {
   const ControlPage({super.key});
 
@@ -23,21 +23,13 @@ class ControlPage extends StatefulWidget {
 }
 
 class _ControlPageState extends State<ControlPage> {
-  late final MachineRepository _repository;
   ClearMode _clearMode = ClearMode.all;
 
   @override
   void initState() {
     super.initState();
-    _repository = context.read<MachineRepository>();
     // Sincroniza com os ControlParams atuais ao abrir a tela (leitura local, não envia nada).
     context.read<ControlBloc>().add(const ControlLoaded());
-  }
-
-  @override
-  void dispose() {
-    unawaited(_repository.haltForSafety());
-    super.dispose();
   }
 
   static const _modeLabels = {
@@ -110,7 +102,7 @@ class _ControlPageState extends State<ControlPage> {
         final forceValid = forceRange != null && snapshot.force >= forceRange.min && snapshot.force <= forceRange.max;
         final canStart = connected && pollingActive && forceValid && !liftBusy;
         // Origem e reset de erro só valem com a máquina parada (a ponte também recusa).
-        final stopped = snapshot.run != RunState.running && state.reportedRun != RunState.running;
+        final stopped = !state.machineRunning;
         ValueChanged<int>? onCoefficient(CoefficientKind kind) =>
             connected ? (value) => bloc.add(CoefficientChanged(kind, value)) : null;
 

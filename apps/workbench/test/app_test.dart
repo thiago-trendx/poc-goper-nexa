@@ -145,22 +145,92 @@ void main() {
   });
 
   group('segurança ao sair da tela de controle', () {
-    testWidgets('trocar de tela envia stop() e para o polling', (tester) async {
+    testWidgets('trocar de tela NÃO para a máquina nem o polling (ADR 0009) e o indicador aparece', (tester) async {
       final gateway = SpyGateway();
       await pumpApp(tester, gateway);
       await connect(tester);
       await gateway.setForce(10);
       await goTo(tester, AppDestination.control);
+      expect(find.byKey(const Key('running_chip')), findsNothing);
       await tester.tap(find.byKey(const Key('control_start')));
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 600));
       expect(gateway.controlSnapshot.run, RunState.running);
-      expect(gateway.isPolling, isTrue);
+      expect(find.byKey(const Key('running_chip')), findsOneWidget);
 
-      await goTo(tester, AppDestination.telemetry);
-      await tester.pump(const Duration(seconds: 1));
+      for (final destination in [AppDestination.telemetry, AppDestination.log, AppDestination.liftMotor]) {
+        await goTo(tester, destination);
+        await tester.pump(const Duration(seconds: 1));
+        expect(gateway.controlSnapshot.run, RunState.running, reason: destination.label);
+        expect(gateway.isPolling, isTrue, reason: destination.label);
+        expect(find.byKey(const Key('running_chip')), findsOneWidget, reason: destination.label);
+      }
 
+      await tester.tap(find.byKey(EmergencyStopButton.buttonKey));
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(gateway.controlSnapshot.run, RunState.stop);
+      expect(find.byKey(const Key('running_chip')), findsNothing);
+      await disposeApp(tester);
+    });
+
+    testWidgets('desligar o polling com a máquina em execução envia STOP antes', (tester) async {
+      final gateway = SpyGateway();
+      await pumpApp(tester, gateway);
+      await connect(tester);
+      await gateway.setForce(10);
+      await gateway.start();
+      await tester.pump(const Duration(milliseconds: 300));
+      await goTo(tester, AppDestination.connection);
+      gateway.calls.clear();
+
+      await tester.tap(find.byKey(const Key('polling_switch')));
+      await tester.pump(const Duration(milliseconds: 700));
+
+      expect(gateway.calls, contains('stop:done'));
       expect(gateway.controlSnapshot.run, RunState.stop);
       expect(gateway.isPolling, isFalse);
+      await disposeApp(tester);
+    });
+
+    testWidgets('desconectar com a máquina em execução envia STOP antes', (tester) async {
+      final gateway = SpyGateway();
+      await pumpApp(tester, gateway);
+      await connect(tester);
+      await gateway.setForce(10);
+      await gateway.start();
+      await tester.pump(const Duration(milliseconds: 300));
+      await goTo(tester, AppDestination.connection);
+      gateway.calls.clear();
+
+      await tester.tap(find.byKey(const Key('disconnect')));
+      await tester.pump(const Duration(milliseconds: 900));
+
+      expect(gateway.calls, contains('stop:done'));
+      expect(gateway.controlSnapshot.run, RunState.stop);
+      expect(find.text('Desconectado'), findsWidgets);
+      await disposeApp(tester);
+    });
+
+    testWidgets('parâmetros e firmware ficam bloqueados com a máquina em execução', (tester) async {
+      final gateway = SpyGateway();
+      await pumpApp(tester, gateway);
+      await connect(tester);
+      await gateway.setForce(10);
+      await gateway.start();
+      await tester.pump(const Duration(milliseconds: 600));
+
+      await goTo(tester, AppDestination.deviceParams);
+      expect(isEnabled(tester, const Key('params_send')), isFalse);
+      expect(find.byKey(const Key('params_running_hint')), findsOneWidget);
+
+      await goTo(tester, AppDestination.firmware);
+      expect(isEnabled(tester, const Key('firmware_install')), isFalse);
+      expect(find.byKey(const Key('firmware_running_hint')), findsOneWidget);
+
+      await tester.tap(find.byKey(EmergencyStopButton.buttonKey));
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(find.byKey(const Key('firmware_running_hint')), findsNothing);
+      await goTo(tester, AppDestination.deviceParams);
+      expect(isEnabled(tester, const Key('params_send')), isTrue);
       await disposeApp(tester);
     });
 
@@ -259,7 +329,7 @@ void main() {
       await connect(tester);
       await gateway.setForce(10);
       await tester.tap(find.byKey(const Key('polling_switch'))); // desliga o polling
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 600)); // STOP + 2 ciclos antes de parar
       await goTo(tester, AppDestination.control);
 
       expect(isEnabled(tester, const Key('control_start')), isFalse);
@@ -629,7 +699,7 @@ void main() {
       await pumpApp(tester, gateway);
       await connect(tester);
       await tester.tap(find.byKey(const Key('polling_switch'))); // desliga o polling
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 600)); // STOP + 2 ciclos antes de parar
       await goTo(tester, AppDestination.liftMotor);
 
       expect(isEnabled(tester, const Key('lift_adjust')), isFalse);
@@ -702,7 +772,7 @@ void main() {
       }
 
       await tester.tap(find.byKey(const Key('polling_switch')));
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 600));
       await tester.tap(find.byKey(const Key('interval_80')));
       await tester.pump(const Duration(milliseconds: 100));
       await tester.tap(find.byKey(const Key('polling_switch')));
@@ -734,7 +804,7 @@ void main() {
       expect(gateway.isPolling, isTrue);
 
       await tester.tap(find.byKey(const Key('polling_switch')));
-      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 600));
       expect(gateway.isPolling, isFalse);
       expect(tester.widget<Switch>(find.byKey(const Key('polling_switch'))).value, isFalse);
 
@@ -793,6 +863,8 @@ void main() {
 
       await tester.tap(find.byKey(const Key('telemetry_record')));
       await tester.pump(const Duration(seconds: 2));
+      expect(find.textContaining('Salvar gravação (CSV)'), findsOneWidget);
+      expect(find.textContaining('Parar gravação'), findsNothing);
       await tester.tap(find.byKey(const Key('telemetry_record')));
       await tester.pump(const Duration(milliseconds: 100));
 
@@ -816,7 +888,14 @@ void main() {
       expect(find.byKey(const Key('rate_test_progress')), findsOneWidget);
       expect(isEnabled(tester, const Key('rate_test_start')), isFalse);
 
-      await tester.pump(const Duration(seconds: 50));
+      // O 1º intervalo (15 s) já terminou, o teste segue: o relatório sairia incompleto.
+      await tester.pump(const Duration(seconds: 14));
+      expect(find.byKey(const Key('rate_test_table')), findsOneWidget);
+      expect(find.byKey(const Key('rate_test_progress')), findsOneWidget);
+      expect(isEnabled(tester, const Key('report_save')), isFalse);
+
+      await tester.pump(const Duration(seconds: 40));
+      expect(isEnabled(tester, const Key('report_save')), isTrue);
 
       expect(find.byKey(const Key('rate_test_table')), findsOneWidget);
       expect(find.byKey(const Key('rate_test_summary')), findsOneWidget);

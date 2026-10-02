@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../shared/widgets/feedback.dart';
 import '../connection/connection_bloc.dart';
+import '../control/control_bloc.dart';
 import 'firmware_bloc.dart';
 
 /// Instalação de firmware (placa adaptadora ou controlador).
@@ -49,6 +50,7 @@ class _FirmwarePageState extends State<FirmwarePage> {
   Widget build(BuildContext context) {
     final bloc = context.read<FirmwareBloc>();
     final connected = context.watch<ConnectionBloc>().state.isConnected;
+    final running = context.select((ControlBloc b) => b.state.machineRunning);
     return BlocBuilder<FirmwareBloc, FirmwareState>(
       builder: (context, state) {
         return ListView(
@@ -103,7 +105,7 @@ class _FirmwarePageState extends State<FirmwarePage> {
                     children: [
                       FilledButton(
                         key: const Key('firmware_install'),
-                        onPressed: connected && !state.installing ? () => _install(context) : null,
+                        onPressed: connected && !running && !state.installing ? () => _install(context) : null,
                         child: const Text('Instalar'),
                       ),
                       OutlinedButton(
@@ -113,6 +115,14 @@ class _FirmwarePageState extends State<FirmwarePage> {
                       ),
                     ],
                   ),
+                  if (running)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Pare a máquina para instalar firmware: o polling é pausado durante a instalação.',
+                        key: Key('firmware_running_hint'),
+                      ),
+                    ),
                   const SizedBox(height: 16),
                   if (state.installing)
                     LinearProgressIndicator(value: state.status == FirmwareStatus.progress ? state.progress / 100 : null),

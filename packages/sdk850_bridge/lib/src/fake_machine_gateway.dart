@@ -257,6 +257,7 @@ class FakeMachineGateway implements MachineGateway {
   @override
   Future<void> sendDeviceParams(DeviceParams params) async {
     _precheck();
+    _requireStopped('enviar os parâmetros');
     final errors = params.validate();
     if (errors.isNotEmpty) {
       throw MachineException(
@@ -434,6 +435,7 @@ class FakeMachineGateway implements MachineGateway {
     int? timeoutMs,
   }) async {
     _precheck();
+    _requireStopped('instalar o firmware');
     if (type != 1 && type != 2) {
       throw const MachineException(MachineErrorCode.invalidArgs, 'type deve ser 1 ou 2');
     }

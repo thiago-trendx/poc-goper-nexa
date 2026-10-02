@@ -181,8 +181,8 @@ enum AppDestination {
 
 /// Navegação lateral com o botão STOP fixo embaixo, visível em todas as telas.
 ///
-/// Ao trocar de destino a tela anterior é descartada, o que dispara o `stop()` de
-/// segurança da tela de controle.
+/// Trocar de tela não para a máquina (ADR 0009): enquanto ela estiver em execução, a barra mostra
+/// o indicador "EM EXECUÇÃO" em qualquer tela.
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, this.simulated = false});
 
@@ -198,11 +198,27 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     final connected = context.select((ConnectionBloc b) => b.state.isConnected);
+    final running = context.select((ControlBloc b) => b.state.machineRunning);
+    final silentSeconds = context.select((TelemetryBloc b) => b.state.silentSeconds);
     return Scaffold(
       appBar: AppBar(
         backgroundColor: widget.simulated ? Colors.amber.shade300 : null,
         title: Text(_selected.label),
         actions: [
+          if (running)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Chip(
+                key: const Key('running_chip'),
+                backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                avatar: const Icon(Icons.play_arrow, size: 18),
+                label: Text(
+                  silentSeconds >= TelemetryPage.silentWarningSeconds
+                      ? 'EM EXECUÇÃO — sem resposta há $silentSeconds s'
+                      : 'EM EXECUÇÃO',
+                ),
+              ),
+            ),
           if (widget.simulated)
             const Padding(
               padding: EdgeInsets.only(right: 8),

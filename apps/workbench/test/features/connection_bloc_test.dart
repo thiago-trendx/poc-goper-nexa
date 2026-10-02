@@ -88,7 +88,7 @@ void main() {
       await Future<void>.delayed(_settle);
       bloc.add(const DisconnectRequested());
     },
-    wait: _settle,
+    wait: const Duration(milliseconds: 700), // STOP + 2 ciclos antes de desconectar
     verify: (bloc) {
       expect(bloc.state.status, LinkStatus.disconnected);
       expect(bloc.state.portPath, isNull);
@@ -105,7 +105,7 @@ void main() {
       bloc.add(const ConnectRequested.auto());
       await Future<void>.delayed(_settle);
       bloc.add(const PollingToggled(intervalMs: 100)); // liga -> desliga
-      await Future<void>.delayed(_settle);
+      await Future<void>.delayed(const Duration(milliseconds: 600)); // STOP + 2 ciclos
       bloc.add(const PollingToggled(intervalMs: 50)); // desliga -> liga
     },
     wait: _settle,

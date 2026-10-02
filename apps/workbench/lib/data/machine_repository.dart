@@ -87,7 +87,11 @@ class MachineRepository {
     return _gateway.connect(portPath);
   }
 
-  Future<void> disconnect() => _gateway.disconnect();
+  /// Manda STOP antes de desconectar: desconectar não pode deixar a máquina em execução.
+  Future<void> disconnect() async {
+    await haltForSafety();
+    await _gateway.disconnect();
+  }
   Future<void> reconnect() => _gateway.reconnect();
   Future<ConnectionInfo> getConnectionInfo() => _gateway.getConnectionInfo();
 
@@ -130,7 +134,8 @@ class MachineRepository {
   /// STOP de emergência: chamado direto pelo botão fixo, sem passar por fila de Bloc.
   Future<void> stop() => _gateway.stop();
 
-  /// Envia `stop()` e depois para o polling (ao sair da tela de controle ou fechar o app).
+  /// Envia `stop()` e depois para o polling (ao fechar o app, ir para segundo plano, desconectar
+  /// ou desligar o polling pela tela Conexão).
   ///
   /// Espera dois ciclos de polling entre os dois passos para que o STOP chegue ao
   /// controlador antes de o envio periódico parar. Falhas são ignoradas: o objetivo é

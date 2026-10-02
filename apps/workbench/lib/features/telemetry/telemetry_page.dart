@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:sdk850_bridge/sdk850_bridge.dart';
 
 import '../../shared/widgets/feedback.dart';
 import '../connection/connection_bloc.dart';
@@ -19,9 +18,7 @@ class TelemetryPage extends StatelessWidget {
   static const silentWarningSeconds = 3;
 
   /// A máquina está em execução, pelo estado local ou pelo que ela reportou.
-  static bool _machineRunning(BuildContext context) =>
-      context.read<TelemetryBloc>().state.latest?.run == RunState.running ||
-      context.read<ControlBloc>().state.snapshot.run == RunState.running;
+  static bool _machineRunning(BuildContext context) => context.read<ControlBloc>().state.machineRunning;
 
   static Future<void> _saveReport(BuildContext context) async {
     final exporter = context.read<TelemetryExporter>();
@@ -107,7 +104,7 @@ class TelemetryPage extends StatelessWidget {
                     key: const Key('telemetry_record'),
                     onPressed: () => bloc.add(const RecordingToggled()),
                     icon: Icon(state.recording ? Icons.stop : Icons.fiber_manual_record),
-                    label: Text(state.recording ? 'Parar gravação (${state.recordedSamples})' : 'Gravar'),
+                    label: Text(state.recording ? 'Salvar gravação (CSV) · ${state.recordedSamples}' : 'Gravar'),
                   ),
                   OutlinedButton(
                     key: const Key('telemetry_clear'),
@@ -233,7 +230,8 @@ class _RateTestSection extends StatelessWidget {
                 ),
                 OutlinedButton(
                   key: const Key('report_save'),
-                  onPressed: test.results.isNotEmpty || errors.isNotEmpty
+                  // Durante o teste o relatório sairia incompleto (faltando os últimos intervalos).
+                  onPressed: !test.running && (test.results.isNotEmpty || errors.isNotEmpty)
                       ? () => TelemetryPage._saveReport(context)
                       : null,
                   child: const Text('Salvar relatório'),

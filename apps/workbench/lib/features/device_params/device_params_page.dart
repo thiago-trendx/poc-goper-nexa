@@ -5,6 +5,7 @@ import 'package:sdk850_bridge/sdk850_bridge.dart';
 
 import '../../shared/widgets/feedback.dart';
 import '../connection/connection_bloc.dart';
+import '../control/control_bloc.dart';
 import 'device_params_bloc.dart';
 
 /// Formulário de `DeviceParams` com as faixas do Javadoc, envio por ação explícita e perfis.
@@ -76,6 +77,7 @@ class _DeviceParamsPageState extends State<DeviceParamsPage> {
   Widget build(BuildContext context) {
     final bloc = context.read<DeviceParamsBloc>();
     final connected = context.watch<ConnectionBloc>().state.isConnected;
+    final running = context.select((ControlBloc b) => b.state.machineRunning);
     return BlocConsumer<DeviceParamsBloc, DeviceParamsState>(
       listenWhen: (previous, current) =>
           previous.errorSeq != current.errorSeq ||
@@ -137,10 +139,16 @@ class _DeviceParamsPageState extends State<DeviceParamsPage> {
                 ),
                 FilledButton.icon(
                   key: const Key('params_send'),
-                  onPressed: connected && !state.ackPending && !state.hasErrors ? () => _send(context) : null,
+                  onPressed:
+                      connected && !running && !state.ackPending && !state.hasErrors ? () => _send(context) : null,
                   icon: const Icon(Icons.upload),
                   label: Text(state.ackPending ? 'Aguardando confirmação…' : 'Enviar ao controlador'),
                 ),
+                if (running)
+                  const Text(
+                    'Pare a máquina para enviar parâmetros: a calibração não deve mudar com ela em execução.',
+                    key: Key('params_running_hint'),
+                  ),
               ],
             ),
             const SizedBox(height: 16),

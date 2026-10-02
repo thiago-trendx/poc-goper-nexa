@@ -241,4 +241,16 @@ internal class DeviceParamsTest {
 
         Mockito.verify(call("sendDeviceParams", validArgs())).error(eq(BridgeException.NOT_CONNECTED), any(), any())
     }
+
+    @Test
+    fun plugin_sendDeviceParamsComAMaquinaEmExecucaoViraBUSYENaoEnvia() {
+        connect()
+        port.control = defaultControl().copy(run = "RUNNING")
+        port.calls.clear()
+
+        Mockito.verify(call("sendDeviceParams", validArgs())).error(eq(BridgeException.BUSY), any(), any())
+
+        assertTrue(port.applied.isEmpty(), "a calibração não pode mudar com a máquina em execução")
+        assertTrue(port.sent.isEmpty())
+    }
 }

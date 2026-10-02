@@ -186,7 +186,8 @@ class ConnectionBloc extends Bloc<ConnectionBlocEvent, ConnectionBlocState> {
   Future<void> _onPollingToggled(PollingToggled event, Emitter<ConnectionBlocState> emit) async {
     try {
       if (state.pollingActive) {
-        await _repository.stopPolling();
+        // Sem polling a máquina não recebe mais ordens: o STOP sai antes.
+        await _repository.haltForSafety();
       } else {
         emit(state.copyWith(pollingIntervalMs: event.intervalMs));
         await _repository.startPolling(intervalMs: event.intervalMs);

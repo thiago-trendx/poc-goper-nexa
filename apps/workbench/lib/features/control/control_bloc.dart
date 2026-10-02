@@ -128,6 +128,11 @@ class ControlState extends Equatable {
   /// Estado de execução que a máquina informou no último status.
   final RunState? reportedRun;
 
+  /// A máquina está em execução. Vale o que ela reportou no último status; o estado local só
+  /// entra antes do primeiro status, porque ele fica desatualizado depois do STOP fixo (que não
+  /// passa por este Bloc).
+  bool get machineRunning => reportedRun != null ? reportedRun == RunState.running : snapshot.run == RunState.running;
+
   /// Falha do último comando; [errorSeq] muda a cada falha para a UI avisar de novo.
   final String? error;
   final int errorSeq;

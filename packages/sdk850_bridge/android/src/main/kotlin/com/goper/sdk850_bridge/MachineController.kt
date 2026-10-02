@@ -125,6 +125,7 @@ class MachineController(
      */
     fun sendDeviceParams(values: ParamsValues) {
         requireConnected()
+        requireStopped("enviar os parâmetros")
         port.send(port.paramsCommand(values))
     }
 
