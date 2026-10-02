@@ -48,6 +48,7 @@ class MethodChannelGateway implements MachineGateway {
     int? sendIntervalMs,
     int? testTimeMs,
     bool? logEnabled,
+    int? maxForceKg,
   }) =>
       _invoke<void>('initialize', {
         'spFileName': spFileName,
@@ -55,6 +56,7 @@ class MethodChannelGateway implements MachineGateway {
         if (sendIntervalMs != null) 'sendIntervalMs': sendIntervalMs,
         if (testTimeMs != null) 'testTimeMs': testTimeMs,
         if (logEnabled != null) 'logEnabled': logEnabled,
+        if (maxForceKg != null) 'maxForceKg': maxForceKg,
       });
 
   @override

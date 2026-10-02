@@ -30,8 +30,9 @@ internal class Sdk850BridgePluginTest {
 
     @Test
     fun metodoDesconhecido_respondeNotImplemented() {
-        Mockito.verify(call("start")).notImplemented()
-        Mockito.verify(call("setForce", mapOf("kg" to 10))).notImplemented()
+        Mockito.verify(call("originReset")).notImplemented()
+        Mockito.verify(call("clearData", mapOf("mode" to "ALL"))).notImplemented()
+        Mockito.verify(call("installFirmware", mapOf("type" to 1))).notImplemented()
     }
 
     @Test

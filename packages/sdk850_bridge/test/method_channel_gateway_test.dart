@@ -47,6 +47,29 @@ void main() {
       expect(calls.single.arguments, {'spFileName': 'sp', 'baudRate': 115200});
     });
 
+    test('initialize envia o limite de força quando informado', () async {
+      await gateway.initialize(spFileName: 'sp', logEnabled: true, maxForceKg: 30);
+      expect(calls.single.arguments, {'spFileName': 'sp', 'logEnabled': true, 'maxForceKg': 30});
+    });
+
+    test('os comandos de controle usam os nomes e argumentos do contrato', () async {
+      await gateway.start();
+      await gateway.setForce(12);
+      await gateway.setMode(ForceMode.centrifugal);
+      await gateway.setElasticMax(60);
+      await gateway.setBalancingForce(7);
+      expect(calls.map((c) => c.method), ['start', 'setForce', 'setMode', 'setElasticMax', 'setBalancingForce']);
+      expect(calls[1].arguments, {'kg': 12});
+      expect(calls[2].arguments, {'mode': 'CENTRIFUGAL'});
+      expect(calls[3].arguments, {'value': 60});
+      expect(calls[4].arguments, {'kg': 7});
+    });
+
+    test('getControlParams converte o Map em ControlSnapshot', () async {
+      mockMethods((_) async => const ControlSnapshot(force: 12, mode: ForceMode.velocity).toMap());
+      expect(await gateway.getControlParams(), const ControlSnapshot(force: 12, mode: ForceMode.velocity));
+    });
+
     test('clearData envia o name() do enum', () async {
       await gateway.clearData(ClearMode.first);
       expect(calls.single.arguments, {'mode': 'FIRST'});

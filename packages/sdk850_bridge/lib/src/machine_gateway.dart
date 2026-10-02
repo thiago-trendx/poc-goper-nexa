@@ -12,12 +12,15 @@ abstract class MachineGateway {
   /// Eventos do lado nativo (broadcast).
   Stream<MachineEvent> get events;
 
+  /// [maxForceKg]: limite de força de segurança do app; o lado nativo recusa `setForce` acima dele e
+  /// recusa `start` se a força atual estiver acima (além da faixa `minForce`–`maxForce` da calibração).
   Future<void> initialize({
     required String spFileName,
     int? baudRate,
     int? sendIntervalMs,
     int? testTimeMs,
     bool? logEnabled,
+    int? maxForceKg,
   });
 
   /// Varre as portas; o resultado chega por evento `connection`.

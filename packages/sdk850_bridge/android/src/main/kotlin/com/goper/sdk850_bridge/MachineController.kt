@@ -23,6 +23,9 @@ class MachineController(
     private var configured = false
     private var logEnabled = false
 
+    /** Limite de força informado pelo app em `initialize`; nulo = só a calibração limita. */
+    private var safetyMaxForceKg: Int? = null
+
     private val loop = PollingLoop(scheduler, onTickError = ::onPollingError) { pollOnce() }
 
     val isPolling: Boolean
@@ -35,7 +38,8 @@ class MachineController(
         baudRate: Int?,
         sendIntervalMs: Long?,
         testTimeMs: Long?,
-        logEnabled: Boolean?
+        logEnabled: Boolean?,
+        maxForceKg: Int? = null
     ) {
         if ((baudRate ?: Args.DEFAULT_BAUD_RATE) <= 0) {
             throw BridgeException(BridgeException.INVALID_ARGS, "baudRate deve ser > 0")
@@ -46,6 +50,9 @@ class MachineController(
         if ((testTimeMs ?: Args.DEFAULT_TEST_TIME_MS) <= 0) {
             throw BridgeException(BridgeException.INVALID_ARGS, "testTimeMs deve ser > 0")
         }
+        if (maxForceKg != null && maxForceKg <= 0) {
+            throw BridgeException(BridgeException.INVALID_ARGS, "maxForceKg deve ser > 0")
+        }
         if (port.isConnected()) {
             throw BridgeException(BridgeException.BUSY, "Desconecte antes de reconfigurar a serial")
         }
@@ -55,6 +62,7 @@ class MachineController(
             deviceInitialized = true
         }
         this.logEnabled = logEnabled ?: false
+        this.safetyMaxForceKg = maxForceKg
         port.configure(
             baudRate = baudRate ?: Args.DEFAULT_BAUD_RATE,
             sendIntervalMs = sendIntervalMs ?: Args.DEFAULT_SEND_INTERVAL_MS,
@@ -79,7 +87,7 @@ class MachineController(
 
     fun disconnect() {
         if (!configured) return
-        loop.stop()
+        haltPolling()
         port.clearSendQueue()
         port.disconnect()
     }
@@ -125,7 +133,7 @@ class MachineController(
     }
 
     fun stopPolling() {
-        loop.stop()
+        haltPolling()
         if (configured) port.clearSendQueue()
     }
 
@@ -149,7 +157,7 @@ class MachineController(
      * `release()` do SDK fica para o desligamento do processo e nunca é chamado aqui.
      */
     fun shutdown() {
-        loop.stop()
+        haltPolling()
         runCatching { port.clearSendQueue() }
         runCatching { port.unregister() }
         runCatching { port.disconnect() }
@@ -157,7 +165,124 @@ class MachineController(
         configured = false
     }
 
+    // ---- Controle (Fase 4) ----
+
+    /**
+     * `ControlParams` atuais, os mesmos que o polling reenvia a cada ciclo. Leitura local: não
+     * envia nada ao controlador nem exige conexão.
+     */
+    fun controlParams(): Map<String, Any?> {
+        requireInitialized()
+        return Mappers.controlParams(port.controlValues())
+    }
+
+    /**
+     * Inicia o movimento. O polling precisa estar ligado (sem ele a máquina não recebe as ordens
+     * seguintes, inclusive o STOP) e a força atual dos `ControlParams` precisa estar dentro da
+     * faixa permitida: o valor padrão do SDK não é conhecido, então o app define a força antes.
+     * O `run = RUNNING` vai no próximo ciclo do polling.
+     */
+    fun start() {
+        requireConnected()
+        if (!loop.isRunning) {
+            throw BridgeException(
+                BridgeException.SDK_ERROR,
+                "Ligue o polling antes de iniciar: sem ele a máquina não recebe as ordens seguintes, inclusive o STOP"
+            )
+        }
+        val force = port.controlValues().force
+        forceProblem(force)?.let {
+            throw BridgeException(
+                BridgeException.OUT_OF_RANGE,
+                "A força atual ($force kg) não é válida: $it. Defina a força antes de iniciar"
+            )
+        }
+        port.setRunning(true)
+    }
+
+    fun setForce(kg: Int) {
+        requireConnected()
+        forceProblem(kg)?.let { throw BridgeException(BridgeException.OUT_OF_RANGE, it) }
+        port.setForce(kg)
+    }
+
+    /** [mode] já validado por [Args.forceMode]. */
+    fun setMode(mode: String) {
+        requireConnected()
+        port.setMode(mode)
+    }
+
+    /** [kind] já validado por [Args.coefficientKind]. */
+    fun setCoefficient(kind: String, value: Int) {
+        requireConnected()
+        val max = when (kind) {
+            "centripetal" -> ControlLimits.CENTRIPETAL_MAX
+            "centrifugal" -> ControlLimits.CENTRIFUGAL_MAX
+            "elastic" -> ControlLimits.ELASTIC_MAX
+            else -> port.deviceParams().velocityRange // velocity: de 0 até o velocityRange da calibração
+        }
+        if (value !in 0..max) {
+            throw BridgeException(BridgeException.OUT_OF_RANGE, "Coeficiente $kind deve estar entre 0 e $max")
+        }
+        port.setCoefficient(kind, value)
+    }
+
+    /** Curso elástico máximo: de 1 até o comprimento máximo do cabo da calibração. */
+    fun setElasticMax(value: Int) {
+        requireConnected()
+        val max = port.deviceParams().maxLength
+        if (value !in 1..max) {
+            throw BridgeException(BridgeException.OUT_OF_RANGE, "O curso elástico deve estar entre 1 e $max")
+        }
+        port.setElasticMax(value)
+    }
+
+    /** [value] já validado por [Args.safeMode] (0, 51 ou 53). */
+    fun setSafeMode(value: Int) {
+        requireConnected()
+        port.setSafeMode(value)
+    }
+
+    fun setBalancingForce(kg: Int) {
+        requireConnected()
+        if (kg !in 0..ControlLimits.BALANCING_FORCE_MAX) {
+            throw BridgeException(
+                BridgeException.OUT_OF_RANGE,
+                "A força de compensação deve estar entre 0 e ${ControlLimits.BALANCING_FORCE_MAX} kg"
+            )
+        }
+        port.setBalancingForce(kg)
+    }
+
+    /**
+     * Faixa de força permitida: de `minForce` a `maxForce` da calibração (como o demo do fabricante),
+     * e nunca acima do limite de segurança do app, se informado. Devolve a mensagem de problema,
+     * ou `null` se [kg] é válido.
+     */
+    private fun forceProblem(kg: Int): String? {
+        val params = port.deviceParams()
+        val cap = safetyMaxForceKg
+        val max = if (cap == null) params.maxForce else minOf(params.maxForce, cap)
+        if (max < params.minForce) {
+            return "o limite de segurança do app ($cap kg) está abaixo da força mínima da calibração (${params.minForce} kg)"
+        }
+        if (kg !in params.minForce..max) {
+            return "a força deve estar entre ${params.minForce} e $max kg" +
+                if (cap != null && cap < params.maxForce) " (limite de segurança do app: $cap kg)" else ""
+        }
+        return null
+    }
+
     // ---- Internos ----
+
+    /**
+     * Para o laço de polling e volta o estado local para `STOP`: sem polling a máquina não recebe
+     * mais ordens, então `getControlParams` nunca deve mostrar `RUNNING` com o polling parado.
+     */
+    private fun haltPolling() {
+        loop.stop()
+        if (configured) runCatching { port.markStop() }
+    }
 
     private fun requireInitialized() {
         if (!configured) {
@@ -179,7 +304,7 @@ class MachineController(
     }
 
     private fun onPollingError(error: Throwable) {
-        loop.stop()
+        haltPolling()
         emit(Mappers.connection("error", port.currentPortPath(), "Falha no polling: ${error.message}"))
     }
 
@@ -192,17 +317,17 @@ class MachineController(
     override fun onConnected(portPath: String) = emit(Mappers.connection("connected", portPath))
 
     override fun onConnectFailed(portPath: String, reason: String) {
-        loop.stop()
+        haltPolling()
         emit(Mappers.connection("failed", portPath, reason))
     }
 
     override fun onDisconnected(portPath: String) {
-        loop.stop()
+        haltPolling()
         emit(Mappers.connection("disconnected", portPath))
     }
 
     override fun onError(message: String) {
-        loop.stop()
+        haltPolling()
         emit(Mappers.connection("error", port.currentPortPath(), message))
     }
 

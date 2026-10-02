@@ -117,8 +117,53 @@ class FakePort : SdkPort {
     override fun pendingCount(): Int = pending
     override fun controlCommand(): ByteArray = controlBytes
 
+    var control = defaultControl()
+
     override fun markStop() {
         calls += "markStop"
+        control = control.copy(run = "STOP")
+    }
+
+    override fun controlValues(): ControlValues = control
+
+    override fun setRunning(running: Boolean) {
+        calls += "setRunning:$running"
+        control = control.copy(run = if (running) "RUNNING" else "STOP")
+    }
+
+    override fun setForce(kg: Int) {
+        calls += "setForce:$kg"
+        control = control.copy(force = kg)
+    }
+
+    override fun setMode(mode: String) {
+        calls += "setMode:$mode"
+        control = control.copy(mode = mode)
+    }
+
+    override fun setCoefficient(kind: String, value: Int) {
+        calls += "setCoefficient:$kind:$value"
+        control = when (kind) {
+            "centripetal" -> control.copy(centripetal = value)
+            "centrifugal" -> control.copy(centrifugal = value)
+            "velocity" -> control.copy(velocity = value)
+            else -> control.copy(elastic = value)
+        }
+    }
+
+    override fun setElasticMax(value: Int) {
+        calls += "setElasticMax:$value"
+        control = control.copy(maxElectric = value)
+    }
+
+    override fun setSafeMode(value: Int) {
+        calls += "setSafeMode:$value"
+        control = control.copy(safeMode = value)
+    }
+
+    override fun setBalancingForce(kg: Int) {
+        calls += "setBalancingForce:$kg"
+        control = control.copy(balancingForce = kg)
     }
 
     val paramsBytes = byteArrayOf(0x0A)
@@ -160,4 +205,23 @@ fun defaultParams() = ParamsValues(
     velocityRange = 20,
     torqueVariationCycle = 50,
     torqueCoefficient = 10
+)
+
+fun defaultControl() = ControlValues(
+    run = "STOP",
+    mode = "STANDARD",
+    force = 0,
+    centripetal = 0,
+    centrifugal = 0,
+    velocity = 0,
+    elastic = 0,
+    safeMode = 0,
+    clearMode = "NONE",
+    motorPosition1 = 0,
+    motorPosition2 = 0,
+    motorSelfCheck = false,
+    balancingForce = 0,
+    maxElectric = 50,
+    needSetOrigin = false,
+    needErrorRestor = false
 )

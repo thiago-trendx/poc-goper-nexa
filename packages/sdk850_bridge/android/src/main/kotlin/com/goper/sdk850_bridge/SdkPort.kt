@@ -55,6 +55,24 @@ interface SdkPort {
     /** Coloca `ControlParams.run` em `STOP`; o envio é feito por [controlCommand] + [send]. */
     fun markStop()
 
+    /** `ControlParams` atuais (valores que o polling reenvia a cada ciclo). */
+    fun controlValues(): ControlValues
+
+    /** `run = RUNNING` ou `STOP`. O valor só chega ao controlador no próximo ciclo de polling. */
+    fun setRunning(running: Boolean)
+
+    fun setForce(kg: Int)
+
+    /** [mode] é o `name()` de `ForceMode`. */
+    fun setMode(mode: String)
+
+    /** [kind]: `centripetal`, `centrifugal`, `velocity` ou `elastic`. */
+    fun setCoefficient(kind: String, value: Int)
+
+    fun setElasticMax(value: Int)
+    fun setSafeMode(value: Int)
+    fun setBalancingForce(kg: Int)
+
     /**
      * `DeviceParams` guardados no `DeviceManager`. É o cache local (SharedPreferences), que o SDK
      * também atualiza com o retorno de `SEND_PARAMS`; **não** é uma leitura do controlador.

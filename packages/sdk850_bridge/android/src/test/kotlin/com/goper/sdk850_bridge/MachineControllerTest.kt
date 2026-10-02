@@ -147,7 +147,7 @@ internal class MachineControllerTest {
         controller.disconnect()
         scheduler.advance(1000)
 
-        assertEquals(listOf("clearSendQueue", "disconnect"), port.calls)
+        assertEquals(listOf("markStop", "clearSendQueue", "disconnect"), port.calls)
         assertFalse(controller.isPolling)
     }
 
@@ -224,7 +224,7 @@ internal class MachineControllerTest {
         scheduler.advance(1000)
 
         assertEquals(sent, port.controlSends)
-        assertEquals(listOf("clearSendQueue"), port.calls)
+        assertEquals(listOf("markStop", "clearSendQueue"), port.calls)
         assertFalse(controller.isPolling)
     }
 
@@ -399,7 +399,7 @@ internal class MachineControllerTest {
         controller.shutdown()
         scheduler.advance(1000)
 
-        assertEquals(listOf("clearSendQueue", "unregister", "disconnect"), port.calls)
+        assertEquals(listOf("markStop", "clearSendQueue", "unregister", "disconnect"), port.calls)
         assertFalse(controller.isPolling)
         assertFalse(port.calls.contains("release"))
     }

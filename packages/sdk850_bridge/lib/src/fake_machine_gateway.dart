@@ -91,7 +91,10 @@ class FakeMachineGateway implements MachineGateway {
   final StreamController<MachineEvent> _controller = StreamController.broadcast();
   final DeviceInfo _deviceInfo;
   DeviceParams _params;
+
+  /// Como no controle real, a força inicial é desconhecida/inválida: o app precisa defini-la.
   ControlSnapshot _control = const ControlSnapshot();
+  int? _safetyMaxForceKg;
 
   bool _connected = false;
   bool _disposed = false;
@@ -163,11 +166,16 @@ class FakeMachineGateway implements MachineGateway {
     int? sendIntervalMs,
     int? testTimeMs,
     bool? logEnabled,
+    int? maxForceKg,
   }) async {
     _precheck(needsConnection: false);
     if (spFileName.trim().isEmpty) {
       throw const MachineException(MachineErrorCode.invalidArgs, 'spFileName vazio');
     }
+    if (maxForceKg != null && maxForceKg <= 0) {
+      throw const MachineException(MachineErrorCode.invalidArgs, 'maxForceKg deve ser > 0');
+    }
+    _safetyMaxForceKg = maxForceKg;
   }
 
   @override
@@ -219,6 +227,8 @@ class FakeMachineGateway implements MachineGateway {
       throw const MachineException(MachineErrorCode.invalidArgs, 'intervalMs deve ser > 0');
     }
     _intervalMs = intervalMs;
+    // Como o nativo: o polling sempre começa em STOP.
+    _control = _control.copyWith(run: RunState.stop);
     _startPollTimer();
   }
 
@@ -227,6 +237,8 @@ class FakeMachineGateway implements MachineGateway {
     _precheck(needsConnection: false);
     _pollTimer?.cancel();
     _pollTimer = null;
+    // Sem polling a máquina não recebe mais ordens: o estado local volta a STOP.
+    _control = _control.copyWith(run: RunState.stop);
   }
 
   @override
@@ -265,6 +277,19 @@ class FakeMachineGateway implements MachineGateway {
   @override
   Future<void> start() async {
     _precheck();
+    if (_pollTimer == null) {
+      throw const MachineException(
+        MachineErrorCode.sdkError,
+        'Ligue o polling antes de iniciar: sem ele a máquina não recebe as ordens seguintes, inclusive o STOP',
+      );
+    }
+    final problem = _forceProblem(_control.force);
+    if (problem != null) {
+      throw MachineException(
+        MachineErrorCode.outOfRange,
+        'A força atual (${_control.force} kg) não é válida: $problem. Defina a força antes de iniciar',
+      );
+    }
     _control = _control.copyWith(run: RunState.running);
   }
 
@@ -297,12 +322,8 @@ class FakeMachineGateway implements MachineGateway {
   @override
   Future<void> setForce(int kg) async {
     _precheck();
-    if (kg < 0 || kg > _params.maxForce) {
-      throw MachineException(
-        MachineErrorCode.outOfRange,
-        'Força deve estar entre 0 e ${_params.maxForce} kg',
-      );
-    }
+    final problem = _forceProblem(kg);
+    if (problem != null) throw MachineException(MachineErrorCode.outOfRange, problem);
     _control = _control.copyWith(force: kg);
   }
 
@@ -315,11 +336,18 @@ class FakeMachineGateway implements MachineGateway {
   @override
   Future<void> setCoefficient(CoefficientKind kind, int value) async {
     _precheck();
-    final max = kind == CoefficientKind.velocity ? _params.velocityRange : null;
-    if (value < 0 || (max != null && value > max)) {
+    // Faixas do demo do fabricante (concêntrico/excêntrico 0–6, elástico 0–10); o isocinético vai de
+    // 0 até o velocityRange da calibração (Javadoc).
+    final max = switch (kind) {
+      CoefficientKind.centripetal => 6,
+      CoefficientKind.centrifugal => 6,
+      CoefficientKind.elastic => 10,
+      CoefficientKind.velocity => _params.velocityRange,
+    };
+    if (value < 0 || value > max) {
       throw MachineException(
         MachineErrorCode.outOfRange,
-        'Coeficiente ${kind.name} deve estar entre 0 e ${max ?? 'o máximo'}',
+        'Coeficiente ${kind.name} deve estar entre 0 e $max',
       );
     }
     _control = switch (kind) {
@@ -333,8 +361,11 @@ class FakeMachineGateway implements MachineGateway {
   @override
   Future<void> setElasticMax(int value) async {
     _precheck();
-    if (value < 0) {
-      throw const MachineException(MachineErrorCode.outOfRange, 'Valor deve ser >= 0');
+    if (value < 1 || value > _params.maxLength) {
+      throw MachineException(
+        MachineErrorCode.outOfRange,
+        'O curso elástico deve estar entre 1 e ${_params.maxLength}',
+      );
     }
     _control = _control.copyWith(maxElectric: value);
   }
@@ -445,6 +476,21 @@ class FakeMachineGateway implements MachineGateway {
     if (needsConnection && !_connected) {
       throw const MachineException(MachineErrorCode.notConnected, 'Sem conexão com a máquina');
     }
+  }
+
+  /// Faixa de força permitida: de `minForce` a `maxForce` da calibração (como o demo do fabricante),
+  /// e nunca acima do limite de segurança do app. Devolve a mensagem de problema ou `null`.
+  String? _forceProblem(int kg) {
+    final cap = _safetyMaxForceKg;
+    final max = cap == null ? _params.maxForce : (cap < _params.maxForce ? cap : _params.maxForce);
+    if (max < _params.minForce) {
+      return 'o limite de segurança do app ($cap kg) está abaixo da força mínima da calibração (${_params.minForce} kg)';
+    }
+    if (kg < _params.minForce || kg > max) {
+      final capNote = cap != null && cap < _params.maxForce ? ' (limite de segurança do app: $cap kg)' : '';
+      return 'a força deve estar entre ${_params.minForce} e $max kg$capNote';
+    }
+    return null;
   }
 
   void _requireLiftIdle() {

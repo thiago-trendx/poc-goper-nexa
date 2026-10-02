@@ -65,6 +65,40 @@ object Args {
         return ParamsValues.fromMap(values)
     }
 
+    /** Inteiro obrigatório em [key]. */
+    fun requiredInt(args: Map<*, *>?, key: String): Int {
+        val value = args?.get(key)
+        if (value is Number) return value.toInt()
+        throw BridgeException(BridgeException.INVALID_ARGS, "Argumento \"$key\" deve ser um inteiro")
+    }
+
+    fun forceMode(args: Map<*, *>?): String {
+        val mode = args?.get("mode")
+        if (mode is String && mode in ControlLimits.MODES) return mode
+        throw BridgeException(
+            BridgeException.INVALID_ARGS,
+            "mode deve ser um de ${ControlLimits.MODES.joinToString(", ")}"
+        )
+    }
+
+    fun coefficientKind(args: Map<*, *>?): String {
+        val kind = args?.get("kind")
+        if (kind is String && kind in ControlLimits.COEFFICIENT_KINDS) return kind
+        throw BridgeException(
+            BridgeException.INVALID_ARGS,
+            "kind deve ser um de ${ControlLimits.COEFFICIENT_KINDS.joinToString(", ")}"
+        )
+    }
+
+    fun safeMode(args: Map<*, *>?): Int {
+        val value = requiredInt(args, "value")
+        if (value in ControlLimits.SAFE_MODES) return value
+        throw BridgeException(
+            BridgeException.INVALID_ARGS,
+            "value deve ser um de ${ControlLimits.SAFE_MODES.joinToString(", ")}"
+        )
+    }
+
     fun pollingInterval(args: Map<*, *>?): Int {
         val ms = optionalInt(args, "intervalMs") ?: DEFAULT_POLLING_MS
         if (ms < MIN_POLLING_MS || ms > MAX_POLLING_MS) {

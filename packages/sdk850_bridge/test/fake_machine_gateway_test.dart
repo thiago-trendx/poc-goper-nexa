@@ -165,10 +165,10 @@ void main() {
     test('em RUNNING força e curso variam e as repetições são contadas', () {
       fakeAsync((async) {
         final c = _connected(async);
+        c.gateway.startPolling(intervalMs: 100);
         c.gateway
           ..setForce(40)
           ..start();
-        c.gateway.startPolling(intervalMs: 100);
         async.elapse(const Duration(seconds: 7));
 
         final statuses = c.events.whereType<DeviceStatus>().toList();
@@ -242,9 +242,172 @@ void main() {
         final g = _connected(async).gateway;
         g.failNextCommand(const MachineException(MachineErrorCode.sdkError, 'boom'));
 
-        expect(_failure(async, g.start())?.code, MachineErrorCode.sdkError);
-        expect(_failure(async, g.start()), isNull);
-        expect(g.controlSnapshot.run, RunState.running);
+        expect(_failure(async, g.setMode(ForceMode.elastic))?.code, MachineErrorCode.sdkError);
+        expect(g.controlSnapshot.mode, ForceMode.standard, reason: 'o comando que falhou não foi aplicado');
+        expect(_failure(async, g.setMode(ForceMode.elastic)), isNull);
+        expect(g.controlSnapshot.mode, ForceMode.elastic);
+      });
+    });
+  });
+
+  group('controle (Fase 4)', () {
+    test('a força inicial é inválida: start recusa até o app definir a força', () {
+      fakeAsync((async) {
+        final g = _connected(async).gateway;
+        g.startPolling();
+        async.flushMicrotasks();
+
+        final failure = _failure(async, g.start());
+
+        expect(failure?.code, MachineErrorCode.outOfRange);
+        expect(failure?.message, contains('Defina a força antes de iniciar'));
+        expect(g.controlSnapshot.run, RunState.stop);
+      });
+    });
+
+    test('start sem polling ligado vira SDK_ERROR e não muda o estado', () {
+      fakeAsync((async) {
+        final g = _connected(async).gateway;
+        g.setForce(10);
+
+        final failure = _failure(async, g.start());
+
+        expect(failure?.code, MachineErrorCode.sdkError);
+        expect(failure?.message, contains('Ligue o polling'));
+        expect(g.controlSnapshot.run, RunState.stop);
+      });
+    });
+
+    test('a força vai de minForce a maxForce da calibração', () {
+      fakeAsync((async) {
+        final g = _connected(async).gateway;
+        final min = g.deviceParams.minForce;
+        final max = g.deviceParams.maxForce;
+
+        g.setForce(min);
+        g.setForce(max);
+        async.flushMicrotasks();
+        expect(g.controlSnapshot.force, max);
+
+        for (final kg in [0, min - 1, max + 1]) {
+          final failure = _failure(async, g.setForce(kg));
+          expect(failure?.code, MachineErrorCode.outOfRange, reason: '$kg kg');
+          expect(failure?.message, contains('entre $min e $max kg'));
+        }
+        expect(g.controlSnapshot.force, max, reason: 'valor recusado não é aplicado');
+      });
+    });
+
+    test('o limite de segurança do app vale além da calibração', () {
+      fakeAsync((async) {
+        final g = FakeMachineGateway(connectDelay: Duration.zero);
+        g.initialize(spFileName: 'sp', maxForceKg: 30);
+        g.autoConnect();
+        async.elapse(const Duration(milliseconds: 10));
+
+        g.setForce(30);
+        final failure = _failure(async, g.setForce(31));
+
+        expect(failure?.code, MachineErrorCode.outOfRange);
+        expect(failure?.message, contains('limite de segurança do app: 30 kg'));
+        expect(g.controlSnapshot.force, 30);
+      });
+    });
+
+    test('start recusa uma força acima do limite de segurança do app', () {
+      fakeAsync((async) {
+        final g = FakeMachineGateway(connectDelay: Duration.zero);
+        g.initialize(spFileName: 'sp', maxForceKg: 20);
+        g.autoConnect();
+        async.elapse(const Duration(milliseconds: 10));
+        g.setForce(20);
+        g.startPolling();
+        async.flushMicrotasks();
+
+        // o limite diminui (novo initialize) com a força antiga ainda aplicada
+        g.disconnect();
+        g.initialize(spFileName: 'sp', maxForceKg: 10);
+        g.autoConnect();
+        async.elapse(const Duration(milliseconds: 10));
+        g.startPolling();
+        async.flushMicrotasks();
+
+        expect(_failure(async, g.start())?.code, MachineErrorCode.outOfRange);
+        expect(g.controlSnapshot.run, RunState.stop);
+      });
+    });
+
+    test('maxForceKg inválido no initialize vira INVALID_ARGS', () {
+      fakeAsync((async) {
+        final g = FakeMachineGateway();
+
+        expect(_failure(async, g.initialize(spFileName: 'sp', maxForceKg: 0))?.code, MachineErrorCode.invalidArgs);
+        expect(_failure(async, g.initialize(spFileName: 'sp', maxForceKg: -3))?.code, MachineErrorCode.invalidArgs);
+      });
+    });
+
+    test('coeficientes seguem as faixas do demo e do velocityRange', () {
+      fakeAsync((async) {
+        final g = _connected(async).gateway;
+        final limits = {
+          CoefficientKind.centripetal: 6,
+          CoefficientKind.centrifugal: 6,
+          CoefficientKind.elastic: 10,
+          CoefficientKind.velocity: g.deviceParams.velocityRange,
+        };
+
+        for (final entry in limits.entries) {
+          g.setCoefficient(entry.key, 0);
+          g.setCoefficient(entry.key, entry.value);
+          async.flushMicrotasks();
+          expect(g.controlSnapshot.coefficient(entry.key), entry.value);
+          expect(_failure(async, g.setCoefficient(entry.key, entry.value + 1))?.code, MachineErrorCode.outOfRange,
+              reason: '${entry.key.name} acima');
+          expect(_failure(async, g.setCoefficient(entry.key, -1))?.code, MachineErrorCode.outOfRange,
+              reason: '${entry.key.name} abaixo');
+        }
+      });
+    });
+
+    test('o curso elástico vai de 1 ao comprimento máximo do cabo', () {
+      fakeAsync((async) {
+        final g = _connected(async).gateway;
+        final max = g.deviceParams.maxLength;
+
+        g.setElasticMax(1);
+        g.setElasticMax(max);
+        async.flushMicrotasks();
+
+        expect(g.controlSnapshot.maxElectric, max);
+        expect(_failure(async, g.setElasticMax(0))?.code, MachineErrorCode.outOfRange);
+        expect(_failure(async, g.setElasticMax(max + 1))?.code, MachineErrorCode.outOfRange);
+      });
+    });
+
+    test('pausar ou religar o polling, ou perder a conexão, volta o estado para STOP', () {
+      fakeAsync((async) {
+        final g = _connected(async).gateway;
+        void run() {
+          g.startPolling();
+          g.setForce(10);
+          g.start();
+          async.flushMicrotasks();
+          expect(g.controlSnapshot.run, RunState.running);
+        }
+
+        run();
+        g.stopPolling();
+        async.flushMicrotasks();
+        expect(g.controlSnapshot.run, RunState.stop, reason: 'stopPolling');
+
+        run();
+        g.startPolling(intervalMs: 100);
+        async.flushMicrotasks();
+        expect(g.controlSnapshot.run, RunState.stop, reason: 'religar o polling reinicia em STOP');
+
+        run();
+        g.simulateDisconnect();
+        expect(g.controlSnapshot.run, RunState.stop, reason: 'perda de conexão');
       });
     });
   });
@@ -320,8 +483,9 @@ void main() {
       fakeAsync((async) {
         final c = _connected(async);
         final g = c.gateway;
-        g.start();
         g.startPolling(intervalMs: 100);
+        g.setForce(10);
+        g.start();
         async.elapse(const Duration(milliseconds: 300));
         c.events.clear();
 

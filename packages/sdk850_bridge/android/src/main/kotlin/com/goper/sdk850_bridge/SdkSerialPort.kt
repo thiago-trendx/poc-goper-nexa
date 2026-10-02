@@ -7,7 +7,9 @@ import com.sunway.sdk850.port.Cmd
 import com.sunway.sdk850.port.DeviceManager
 import com.sunway.sdk850.port.bean.DeviceInfo
 import com.sunway.sdk850.port.bean.DeviceParams
+import com.sunway.sdk850.port.bean.ControlParams
 import com.sunway.sdk850.port.bean.DeviceStatus
+import com.sunway.sdk850.port.bean.ForceMode
 import com.sunway.sdk850.port.bean.RunState
 import com.sunway.sdk850.port.bean.SerialPacketType
 
@@ -103,9 +105,57 @@ class SdkSerialPort : SdkPort {
     override fun controlCommand(): ByteArray =
         Cmd.control(DeviceManager.getInstance().getControlParams())
 
-    override fun markStop() {
-        DeviceManager.getInstance().getControlParams().setRun(RunState.STOP)
+    private val control: ControlParams
+        get() = DeviceManager.getInstance().getControlParams()
+
+    override fun markStop() = setRunning(false)
+
+    override fun setRunning(running: Boolean) {
+        control.setRun(if (running) RunState.RUNNING else RunState.STOP)
     }
+
+    override fun controlValues(): ControlValues {
+        val c = control
+        return ControlValues(
+            run = c.getRun()?.name,
+            mode = c.getMode()?.name,
+            force = c.getForce(),
+            centripetal = c.getCentripetal(),
+            centrifugal = c.getCentrifugal(),
+            velocity = c.getVelocity(),
+            elastic = c.getElastic(),
+            safeMode = c.getSafeMode(),
+            clearMode = c.getClearMode()?.name,
+            motorPosition1 = c.getMotorPosition1(),
+            motorPosition2 = c.getMotorPosition2(),
+            motorSelfCheck = c.isMotorSelfCheck(),
+            balancingForce = c.getBalancingForce(),
+            maxElectric = c.getMaxElectric(),
+            needSetOrigin = c.isNeedSetOrigin(),
+            needErrorRestor = c.isNeedErrorRestor()
+        )
+    }
+
+    override fun setForce(kg: Int) = control.setForce(kg)
+
+    override fun setMode(mode: String) = control.setMode(ForceMode.valueOf(mode))
+
+    override fun setCoefficient(kind: String, value: Int) {
+        when (kind) {
+            "centripetal" -> control.setCentripetal(value)
+            "centrifugal" -> control.setCentrifugal(value)
+            "velocity" -> control.setVelocity(value)
+            "elastic" -> control.setElastic(value)
+            else -> throw IllegalArgumentException("kind inválido: $kind")
+        }
+    }
+
+    // O Javadoc usa setMaxElectric; o guia do fabricante cita setMaxElectricLength (pergunta 7).
+    override fun setElasticMax(value: Int) = control.setMaxElectric(value)
+
+    override fun setSafeMode(value: Int) = control.setSafeMode(value)
+
+    override fun setBalancingForce(kg: Int) = control.setBalancingForce(kg)
 
     override fun deviceParams(): ParamsValues = DeviceManager.getInstance().getDeviceParams().toValues()
 

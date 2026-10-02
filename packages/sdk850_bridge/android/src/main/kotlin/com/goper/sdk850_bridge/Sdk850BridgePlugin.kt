@@ -48,7 +48,8 @@ class Sdk850BridgePlugin(
                         baudRate = Args.optionalInt(args, "baudRate"),
                         sendIntervalMs = Args.optionalLong(args, "sendIntervalMs"),
                         testTimeMs = Args.optionalLong(args, "testTimeMs"),
-                        logEnabled = Args.optionalBool(args, "logEnabled")
+                        logEnabled = Args.optionalBool(args, "logEnabled"),
+                        maxForceKg = Args.optionalInt(args, "maxForceKg")
                     )
                     result.success(null)
                 }
@@ -96,6 +97,43 @@ class Sdk850BridgePlugin(
 
                 "stop" -> {
                     controller.stop()
+                    result.success(null)
+                }
+
+                "getControlParams" -> result.success(controller.controlParams())
+
+                "start" -> {
+                    controller.start()
+                    result.success(null)
+                }
+
+                "setForce" -> {
+                    controller.setForce(Args.requiredInt(args, "kg"))
+                    result.success(null)
+                }
+
+                "setMode" -> {
+                    controller.setMode(Args.forceMode(args))
+                    result.success(null)
+                }
+
+                "setCoefficient" -> {
+                    controller.setCoefficient(Args.coefficientKind(args), Args.requiredInt(args, "value"))
+                    result.success(null)
+                }
+
+                "setElasticMax" -> {
+                    controller.setElasticMax(Args.requiredInt(args, "value"))
+                    result.success(null)
+                }
+
+                "setSafeMode" -> {
+                    controller.setSafeMode(Args.safeMode(args))
+                    result.success(null)
+                }
+
+                "setBalancingForce" -> {
+                    controller.setBalancingForce(Args.requiredInt(args, "kg"))
                     result.success(null)
                 }
 
