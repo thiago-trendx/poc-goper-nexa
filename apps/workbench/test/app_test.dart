@@ -300,6 +300,49 @@ void main() {
       await disposeApp(tester);
     });
 
+    testWidgets('disparo único pede confirmação e só envia depois de confirmar', (tester) async {
+      final gateway = SpyGateway();
+      await pumpApp(tester, gateway);
+      await connect(tester);
+      await goTo(tester, AppDestination.control);
+
+      await tester.tap(find.byKey(const Key('one_shot_origin')));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('Redefinir a origem?'), findsOneWidget);
+      await confirmDialog(tester, confirm: false);
+      expect(gateway.calls.where((c) => c.startsWith('originReset')), isEmpty);
+
+      await tester.tap(find.byKey(const Key('one_shot_origin')));
+      await tester.pump(const Duration(milliseconds: 100));
+      await confirmDialog(tester, confirm: true);
+      expect(gateway.calls.where((c) => c.startsWith('originReset')), ['originReset:start', 'originReset:done']);
+
+      await tester.tap(find.byKey(const Key('one_shot_clear')));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.textContaining('Limpar as contagens'), findsOneWidget);
+      await confirmDialog(tester, confirm: true);
+      expect(gateway.calls.where((c) => c.startsWith('clearData')), ['clearData:ALL:start', 'clearData:ALL:done']);
+      await disposeApp(tester);
+    });
+
+    testWidgets('origem e reset de erro ficam desabilitados com a máquina em execução', (tester) async {
+      final gateway = SpyGateway();
+      await pumpApp(tester, gateway);
+      await connect(tester);
+      await gateway.setForce(10);
+      await goTo(tester, AppDestination.control);
+      expect(isEnabled(tester, const Key('one_shot_origin')), isTrue);
+
+      await tester.tap(find.byKey(const Key('control_start')));
+      await tester.pump(const Duration(milliseconds: 600));
+
+      expect(isEnabled(tester, const Key('one_shot_origin')), isFalse);
+      expect(isEnabled(tester, const Key('one_shot_error')), isFalse);
+      expect(isEnabled(tester, const Key('one_shot_clear')), isTrue, reason: 'limpar dados vale em execução');
+      expect(find.byKey(const Key('one_shot_hint')), findsOneWidget);
+      await disposeApp(tester);
+    });
+
     testWidgets('os coeficientes mostram a faixa de cada modo', (tester) async {
       await pumpApp(tester, SpyGateway());
       await connect(tester);
@@ -575,6 +618,30 @@ void main() {
       expect(gateway.controlSnapshot.motorPosition1, 2);
       expect(gateway.controlSnapshot.motorPosition2, 3);
       await tester.pump(const Duration(seconds: 5));
+      await disposeApp(tester);
+    });
+
+    testWidgets('ajuste e autoteste ficam desabilitados sem o polling e a tela explica', (tester) async {
+      final gateway = SpyGateway();
+      await pumpApp(tester, gateway);
+      await connect(tester);
+      await tester.tap(find.byKey(const Key('polling_switch'))); // desliga o polling
+      await tester.pump(const Duration(milliseconds: 100));
+      await goTo(tester, AppDestination.liftMotor);
+
+      expect(isEnabled(tester, const Key('lift_adjust')), isFalse);
+      expect(isEnabled(tester, const Key('lift_self_check')), isFalse);
+      expect(find.textContaining('Ligue o polling na tela Conexão'), findsOneWidget);
+      await disposeApp(tester);
+    });
+
+    testWidgets('com o polling ligado a tela avisa que a máquina fica em STOP no fim', (tester) async {
+      await pumpApp(tester, SpyGateway());
+      await connect(tester);
+      await goTo(tester, AppDestination.liftMotor);
+
+      expect(isEnabled(tester, const Key('lift_adjust')), isTrue);
+      expect(find.textContaining('a máquina fica em STOP no fim'), findsOneWidget);
       await disposeApp(tester);
     });
   });

@@ -62,6 +62,15 @@ class SpyGateway extends FakeMachineGateway {
       _delayed('setCoefficient', () => super.setCoefficient(kind, value));
 
   @override
+  Future<void> originReset() => _delayed('originReset', () => super.originReset());
+
+  @override
+  Future<void> errorRestore() => _delayed('errorRestore', () => super.errorRestore());
+
+  @override
+  Future<void> clearData(ClearMode mode) => _delayed('clearData:${mode.wire}', () => super.clearData(mode));
+
+  @override
   Future<void> stop() {
     calls.add('stop:start');
     return super.stop().whenComplete(() => calls.add('stop:done'));

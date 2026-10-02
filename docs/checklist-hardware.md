@@ -94,3 +94,13 @@ Tudo abaixo é **observado, não confirmado pelo fabricante**. Execuções feita
 
 ### Pendências
 - Efeito de cada campo em STOP; comportamento ao parar o polling com a máquina em execução; escala do coeficiente elástico; por que `velocidade` fica em 0.
+
+## Fase 5 — roteiro de bancada (NÃO executado ainda)
+Registrar o que for observado como "observado, não confirmado pelo fabricante". Parada de emergência física ao alcance, duas pessoas, área livre, sem carga no cabo. Um teste por vez; salvar o log depois de cada um.
+
+1. **Limpar dados** (só contagens): fazer algumas repetições em STOP, limpar `Todos`. Esperado: `rep` volta a 0. No log, o TX do comando de controle aparece **uma vez** com o `clearMode` diferente de `NONE` (bytes) e os seguintes já voltam ao normal. *Isso responde se o comando se repete.*
+2. **Reset de erro**: só se houver erro; senão apenas observar o TX (uma vez, `run = ERROR_RESTORE`) e que o estado volta a STOP.
+3. **Redefinir origem** (altera o ponto zero do curso): com o cabo na posição de repouso; observar `curso`, `rep` e o byte do comando (uma vez).
+4. **Ajuste de posição dos motores**: ler as posições atuais em Controle; ajustar **só 1 passo** em um motor, com o ajuste confirmado. Medir o tempo até `liftMotorStatus` voltar a `0x00` e se o status passa por `0x01`. Anotar o tempo (resposta à pergunta de `MOTOR_LONG_TIME`). Depois voltar à posição original.
+5. **Autoteste** (130 s, move os motores): só com tudo livre. Medir quando termina, se o status passa por `0x02` e se o flag `false` é enviado na hora (log).
+6. **Abortos**: durante o ajuste/autoteste, desligar o polling e conferir que o flag volta a `false` e a tela mostra `timeout`.

@@ -75,13 +75,15 @@ class _LiftMotorPageState extends State<LiftMotorPage> {
   @override
   Widget build(BuildContext context) {
     final connected = context.watch<ConnectionBloc>().state.isConnected;
+    final pollingActive = context.select((ConnectionBloc b) => b.state.pollingActive);
     return BlocConsumer<LiftMotorBloc, LiftMotorState>(
       listenWhen: (previous, current) => previous.errorSeq != current.errorSeq,
       listener: (context, state) {
         if (state.error != null) showMessage(context, state.error!, isError: true);
       },
       builder: (context, state) {
-        final enabled = connected && !state.busy;
+        // O controlador só recebe posição e autoteste pelo polling.
+        final enabled = connected && pollingActive && !state.busy;
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -115,6 +117,17 @@ class _LiftMotorPageState extends State<LiftMotorPage> {
                     key: const Key('lift_self_check'),
                     onPressed: enabled ? () => _selfCheck(context) : null,
                     child: const Text('Autoteste'),
+                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: Text(
+                      key: const Key('lift_hint'),
+                      connected && !pollingActive && !state.busy
+                          ? 'Ligue o polling na tela Conexão: o controlador só recebe as ordens pelo polling.'
+                          : 'O movimento é parado antes de cada operação e a máquina fica em STOP no fim: '
+                              'use Iniciar na tela Controle para voltar a mover. O STOP continua disponível.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                   ),
                 ],
               ),

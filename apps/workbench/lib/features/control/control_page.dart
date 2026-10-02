@@ -9,6 +9,7 @@ import '../../shared/safety/safety_limits.dart';
 import '../../shared/widgets/feedback.dart';
 import '../connection/connection_bloc.dart';
 import '../device_params/device_params_bloc.dart';
+import '../lift_motor/lift_motor_bloc.dart';
 import '../telemetry/telemetry_bloc.dart';
 import '../telemetry/telemetry_page.dart';
 import 'control_bloc.dart';
@@ -54,6 +55,30 @@ class _ControlPageState extends State<ControlPage> {
     ClearMode.all: 'Todos',
   };
 
+  /// Disparo único: sempre com confirmação, porque altera a origem, as contagens ou o estado do controlador.
+  Future<void> _confirmOneShot(ControlBloc bloc, OneShotKind kind, {ClearMode clearMode = ClearMode.all}) async {
+    final (title, message, label) = switch (kind) {
+      OneShotKind.originReset => (
+          'Redefinir a origem?',
+          'A máquina redefine a origem do curso e as contagens de repetições são zeradas. '
+              'Faça isso só com a máquina parada.',
+          'Redefinir',
+        ),
+      OneShotKind.errorRestore => (
+          'Enviar reset de erro?',
+          'O controlador tenta restaurar os erros. Só com a máquina parada e a área livre.',
+          'Enviar',
+        ),
+      OneShotKind.clearData => (
+          'Limpar as contagens (${_clearLabels[clearMode]})?',
+          'Zera as contagens de repetições. O comando é enviado uma única vez.',
+          'Limpar',
+        ),
+    };
+    final confirmed = await confirmAction(context, title: title, message: message, confirmLabel: label);
+    if (confirmed && mounted) bloc.add(OneShotRequested(kind, clearMode: clearMode));
+  }
+
   static String _runLabel(RunState? run) => switch (run) {
         null => 'Sem status',
         RunState.running => 'Em execução',
@@ -73,6 +98,7 @@ class _ControlPageState extends State<ControlPage> {
     final pollingActive = context.select((ConnectionBloc b) => b.state.pollingActive);
     final forceRange = limits.forceRange(minForce);
     final silentSeconds = context.select((TelemetryBloc b) => b.state.silentSeconds);
+    final liftBusy = context.select((LiftMotorBloc b) => b.state.busy);
 
     return BlocConsumer<ControlBloc, ControlState>(
       listenWhen: (previous, current) => previous.errorSeq != current.errorSeq,
@@ -82,7 +108,9 @@ class _ControlPageState extends State<ControlPage> {
       builder: (context, state) {
         final snapshot = state.snapshot;
         final forceValid = forceRange != null && snapshot.force >= forceRange.min && snapshot.force <= forceRange.max;
-        final canStart = connected && pollingActive && forceValid;
+        final canStart = connected && pollingActive && forceValid && !liftBusy;
+        // Origem e reset de erro só valem com a máquina parada (a ponte também recusa).
+        final stopped = snapshot.run != RunState.running && state.reportedRun != RunState.running;
         ValueChanged<int>? onCoefficient(CoefficientKind kind) =>
             connected ? (value) => bloc.add(CoefficientChanged(kind, value)) : null;
 
@@ -143,7 +171,9 @@ class _ControlPageState extends State<ControlPage> {
                     const SizedBox(height: 8),
                     Text(
                       key: const Key('control_start_hint'),
-                      !pollingActive
+                      liftBusy
+                          ? 'Os motores de elevação estão em operação: aguarde o fim para iniciar.'
+                          : !pollingActive
                           ? 'Para iniciar, ligue o polling na tela Conexão: sem ele a máquina não recebe o STOP.'
                           : forceRange == null
                               ? 'O limite de carga do app (${limits.maxForceKg} kg) está abaixo da força mínima ($minForce kg).'
@@ -259,12 +289,16 @@ class _ControlPageState extends State<ControlPage> {
                 children: [
                   OutlinedButton(
                     key: const Key('one_shot_origin'),
-                    onPressed: connected ? () => bloc.add(const OneShotRequested(OneShotKind.originReset)) : null,
+                    onPressed: connected && stopped && !liftBusy
+                        ? () => _confirmOneShot(bloc, OneShotKind.originReset)
+                        : null,
                     child: const Text('Redefinir origem'),
                   ),
                   OutlinedButton(
                     key: const Key('one_shot_error'),
-                    onPressed: connected ? () => bloc.add(const OneShotRequested(OneShotKind.errorRestore)) : null,
+                    onPressed: connected && stopped && !liftBusy
+                        ? () => _confirmOneShot(bloc, OneShotKind.errorRestore)
+                        : null,
                     child: const Text('Reset de erro'),
                   ),
                   DropdownButton<ClearMode>(
@@ -277,12 +311,20 @@ class _ControlPageState extends State<ControlPage> {
                   ),
                   OutlinedButton(
                     key: const Key('one_shot_clear'),
-                    onPressed: connected
-                        ? () => bloc.add(OneShotRequested(OneShotKind.clearData, clearMode: _clearMode))
+                    onPressed: connected && !liftBusy
+                        ? () => _confirmOneShot(bloc, OneShotKind.clearData, clearMode: _clearMode)
                         : null,
                     child: const Text('Limpar dados'),
                   ),
                 ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                'Redefinir origem e Reset de erro só com a máquina parada. Cada comando é enviado uma única vez.',
+                key: const Key('one_shot_hint'),
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
           ],

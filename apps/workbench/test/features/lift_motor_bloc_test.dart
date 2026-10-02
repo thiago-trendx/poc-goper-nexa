@@ -18,6 +18,9 @@ import 'package:sdk850_bridge/testing.dart';
   final bloc = LiftMotorBloc(repository);
   repository.autoConnect();
   async.elapse(const Duration(milliseconds: 10));
+  // Ajuste e autoteste só valem com o polling ligado: é por ele que as ordens chegam à máquina.
+  repository.startPolling(intervalMs: 100);
+  async.flushMicrotasks();
   return (gateway: gateway, repository: repository, bloc: bloc);
 }
 
@@ -96,7 +99,7 @@ void main() {
       async.flushMicrotasks();
 
       expect(env.bloc.state.phase, LiftPhase.idle);
-      expect(env.bloc.state.error, 'Posição deve ser >= 0');
+      expect(env.bloc.state.error, 'As posições dos motores devem ser >= 0');
       expect(env.bloc.state.errorSeq, 1);
 
       _teardown(async, env.bloc, env.repository);
